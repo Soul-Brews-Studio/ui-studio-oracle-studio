@@ -2,10 +2,19 @@
 
 React dashboard for [oracle-v2](https://github.com/Soul-Brews-Studio/oracle-v2) API.
 
-## Setup
+## Quick Start
 
 ```bash
-bun install
+bunx oracle-studio
+```
+
+Serves the dashboard on http://localhost:3000, proxying API requests to oracle-v2 on port 47778.
+
+### Options
+
+```bash
+bunx oracle-studio --port 4000              # custom port
+bunx oracle-studio --api http://host:47778  # custom API URL
 ```
 
 ## Development
@@ -17,23 +26,16 @@ Start the oracle-v2 API server first:
 bun run server  # http://localhost:47778
 ```
 
-Then start the dashboard:
+Then start the dev server with HMR:
 
 ```bash
+bun install
 bun run dev     # http://localhost:3000
 ```
 
-The dev server proxies `/api/*` requests to the oracle-v2 API on port 47778.
-
-### Custom API URL
+## Build & Publish
 
 ```bash
-ORACLE_API_URL=http://your-server:47778 bun run dev
-```
-
-## Build
-
-```bash
-bun run build
-bun run preview
+bun run build     # build to dist/
+npm publish       # publishes dist/ + bin/
 ```

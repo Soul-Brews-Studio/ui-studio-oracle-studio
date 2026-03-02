@@ -1,13 +1,29 @@
 {
   "name": "oracle-studio",
-  "private": true,
   "version": "0.1.0",
   "type": "module",
+  "description": "React dashboard for oracle-v2 API",
+  "bin": {
+    "oracle-studio": "./bin/serve.ts"
+  },
+  "files": [
+    "bin/",
+    "dist/"
+  ],
+  "engines": {
+    "bun": ">=1.2.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Soul-Brews-Studio/oracle-studio.git"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "serve": "bun bin/serve.ts",
     "lint": "eslint .",
     "preview": "vite preview",
+    "prepublishOnly": "bun run build",
     "test": "bunx playwright test",
     "test:ui": "bunx playwright test --ui"
   },
@@ -35,5 +51,7 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4"
-  }
+  },
+  "author": "Soul Brews Studio",
+  "license": "MIT"
 }
