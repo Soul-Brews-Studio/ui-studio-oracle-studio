@@ -12,8 +12,27 @@ const gitHash = (() => {
 })()
 const appVersion = `v${pkg.version}+${gitHash}`
 
+// Auto-start Oracle backend when dev server starts
+function oracleAutoStart() {
+  return {
+    name: 'oracle-auto-start',
+    configureServer() {
+      try {
+        execSync('bun run server:ensure', {
+          cwd: resolve(__dirname, '../oracle-v2'),
+          timeout: 15000,
+          stdio: 'pipe',
+        })
+        console.log('🔮 Oracle backend ready')
+      } catch {
+        console.warn('⚠️  Could not auto-start Oracle backend')
+      }
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), oracleAutoStart()],
   define: {
     __APP_VERSION__: JSON.stringify(appVersion)
   },
