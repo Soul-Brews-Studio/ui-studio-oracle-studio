@@ -38,6 +38,7 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: process.env.ORACLE_API_URL || 'http://localhost:47778'

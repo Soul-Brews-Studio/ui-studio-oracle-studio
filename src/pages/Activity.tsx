@@ -8,7 +8,7 @@ import styles from './Activity.module.css';
 const PERIODS = ['week', 'month', 'quarter'] as const;
 type Period = typeof PERIODS[number];
 
-const TABS = ['gaps', 'searches', 'consultations', 'learnings'] as const;
+const TABS = ['gaps', 'searches', 'learnings'] as const;
 type Tab = typeof TABS[number];
 
 function formatTimeAgo(dateString: string): string {
@@ -36,18 +36,13 @@ export function Activity() {
   const period = (searchParams.get('period') as Period) || 'week';
   const activeTab = (searchParams.get('tab') as Tab) || 'gaps';
 
-  // Knowledge gaps: searches and consultations with 0 results
+  // Knowledge gaps: searches with 0 results
   const gaps = [
-    ...(activity?.searches.filter(s => s.results_count === 0).map(s => ({
+    ...(activity?.searches?.filter(s => s.results_count === 0).map(s => ({
       type: 'search' as const,
       query: s.query,
       created_at: s.created_at
     })) || []),
-    ...(activity?.consultations.filter(c => c.principles_found === 0 && c.patterns_found === 0).map(c => ({
-      type: 'consult' as const,
-      query: c.decision,
-      created_at: c.created_at
-    })) || [])
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   function setPeriod(newPeriod: Period) {
@@ -88,13 +83,9 @@ export function Activity() {
   }
 
   // Calculate averages
-  const avgSearchTime = activity?.searches.length
+  const avgSearchTime = activity?.searches?.length
     ? Math.round(activity.searches.reduce((sum, s) => sum + s.search_time_ms, 0) / activity.searches.length)
     : 0;
-
-  const avgMatches = activity?.consultations.length
-    ? (activity.consultations.reduce((sum, c) => sum + c.principles_found + c.patterns_found, 0) / activity.consultations.length).toFixed(1)
-    : '0';
 
   if (loading && !summary) {
     return <div className={styles.loading}>Loading activity data...</div>;
@@ -104,7 +95,7 @@ export function Activity() {
     <div className={styles.container}>
       <header className={styles.header}>
         <h1 className={styles.title}>Activity</h1>
-        <p className={styles.subtitle}>Search logs, consultations, and learning history</p>
+        <p className={styles.subtitle}>Search logs and learning history</p>
       </header>
 
       {/* Period Selector */}
@@ -145,16 +136,6 @@ export function Activity() {
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab('consultations')}
-          className={`${styles.statCard} ${styles.clickableCard} ${activeTab === 'consultations' ? styles.activeCard : ''}`}
-        >
-          <div className={styles.statIcon}>💬</div>
-          <div className={styles.statValue}>{summary?.activity.consultations_7d ?? 0}</div>
-          <div className={styles.statLabel}>Consultations</div>
-          <div className={styles.statMeta}>avg {avgMatches} matches</div>
-        </button>
-        <button
-          type="button"
           onClick={() => setActiveTab('learnings')}
           className={`${styles.statCard} ${styles.clickableCard} ${activeTab === 'learnings' ? styles.activeCard : ''}`}
         >
@@ -191,7 +172,6 @@ export function Activity() {
               />
               <Legend />
               <Line type="monotone" dataKey="searches" stroke="#a78bfa" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="consultations" stroke="#4ade80" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="documents" stroke="#fbbf24" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
@@ -224,9 +204,8 @@ export function Activity() {
               {tab === 'gaps' ? 'Knowledge Gaps' : tab.charAt(0).toUpperCase() + tab.slice(1)}
               <span className={`${styles.tabCount} ${tab === 'gaps' && gaps.length > 0 ? styles.gapCount : ''}`}>
                 {tab === 'gaps' ? gaps.length :
-                 tab === 'searches' ? activity?.searches.length ?? 0 :
-                 tab === 'consultations' ? activity?.consultations.length ?? 0 :
-                 activity?.learnings.length ?? 0}
+                 tab === 'searches' ? activity?.searches?.length ?? 0 :
+                 activity?.learnings?.length ?? 0}
               </span>
             </button>
           ))}
@@ -236,11 +215,11 @@ export function Activity() {
           {/* Knowledge Gaps Tab */}
           {activeTab === 'gaps' && gaps.map((g, i) => (
             <div key={i} className={`${styles.activityItem} ${styles.gapItem}`}>
-              <div className={styles.activityIcon}>{g.type === 'search' ? '🔍' : '💬'}</div>
+              <div className={styles.activityIcon}>🔍</div>
               <div className={styles.activityContent}>
                 <div className={styles.activityTitle}>"{g.query}"</div>
                 <div className={styles.activityMeta}>
-                  No results found &middot; {g.type === 'search' ? 'Search' : 'Consult'}
+                  No results found
                 </div>
               </div>
               <div className={styles.gapActions}>
@@ -255,7 +234,6 @@ export function Activity() {
                   type="button"
                   className={styles.learnBtn}
                   onClick={() => {
-                    // Trigger QuickLearn with pre-filled query
                     const event = new CustomEvent('quicklearn:open', { detail: { query: g.query } });
                     window.dispatchEvent(event);
                   }}
@@ -274,7 +252,7 @@ export function Activity() {
           )}
 
           {/* Searches Tab */}
-          {activeTab === 'searches' && activity?.searches.map((s, i) => (
+          {activeTab === 'searches' && activity?.searches?.map((s, i) => (
             <Link
               key={i}
               to={`/search?q=${encodeURIComponent(s.query)}`}
@@ -295,29 +273,8 @@ export function Activity() {
             </Link>
           ))}
 
-          {/* Consultations Tab */}
-          {activeTab === 'consultations' && activity?.consultations.map((c, i) => {
-            const hasResults = c.principles_found > 0 || c.patterns_found > 0;
-            return (
-              <div key={i} className={`${styles.activityItem} ${!hasResults ? styles.gapItem : ''}`}>
-                <div className={styles.activityIcon}>💬</div>
-                <div className={styles.activityContent}>
-                  <div className={styles.activityTitle}>"{c.decision}"</div>
-                  <div className={styles.activityMeta}>
-                    {!hasResults ? (
-                      <span className={styles.noResults}>No matches</span>
-                    ) : (
-                      <>{c.principles_found} principles &middot; {c.patterns_found} patterns</>
-                    )}
-                  </div>
-                </div>
-                <div className={styles.activityTime}>{formatTimeAgo(c.created_at)}</div>
-              </div>
-            );
-          })}
-
           {/* Learnings Tab */}
-          {activeTab === 'learnings' && activity?.learnings.map((l, i) => (
+          {activeTab === 'learnings' && activity?.learnings?.map((l, i) => (
             <div key={i} className={styles.activityItem}>
               <div className={styles.activityIcon}>📚</div>
               <div className={styles.activityContent}>
@@ -331,13 +288,10 @@ export function Activity() {
           ))}
 
           {/* Empty States */}
-          {activeTab === 'searches' && !activity?.searches.length && (
+          {activeTab === 'searches' && !activity?.searches?.length && (
             <div className={styles.empty}>No searches in this period</div>
           )}
-          {activeTab === 'consultations' && !activity?.consultations.length && (
-            <div className={styles.empty}>No consultations in this period</div>
-          )}
-          {activeTab === 'learnings' && !activity?.learnings.length && (
+          {activeTab === 'learnings' && !activity?.learnings?.length && (
             <div className={styles.empty}>No learnings added in this period</div>
           )}
         </div>

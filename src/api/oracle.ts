@@ -156,12 +156,11 @@ export async function getMap(): Promise<{ documents: MapDocument[]; total: numbe
 export interface DashboardSummary {
   documents: { total: number; by_type: Record<string, number> };
   concepts: { total: number; top: Array<{ name: string; count: number }> };
-  activity: { consultations_7d: number; searches_7d: number; learnings_7d: number };
+  activity: { searches_7d: number; learnings_7d: number };
   health: { fts_status: string; last_indexed: string | null };
 }
 
 export interface DashboardActivity {
-  consultations: Array<{ decision: string; principles_found: number; patterns_found: number; created_at: string }>;
   searches: Array<{ query: string; type: string; results_count: number; search_time_ms: number; created_at: string }>;
   learnings: Array<{ document_id: string; pattern_preview: string; source: string; concepts: string[]; created_at: string }>;
   days: number;
@@ -170,7 +169,7 @@ export interface DashboardActivity {
 export interface DashboardGrowth {
   period: string;
   days: number;
-  data: Array<{ date: string; documents: number; consultations: number; searches: number }>;
+  data: Array<{ date: string; documents: number; searches: number }>;
 }
 
 // Get dashboard summary
