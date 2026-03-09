@@ -148,7 +148,7 @@ export function Map() {
     sceneRef.current = scene;
 
     // Camera — wider FOV, pulled back to see full cloud
-    const camera = new THREE.PerspectiveCamera(70, width / height, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(70, width / height, 0.1, 2000);
     camera.position.z = 16;
     cameraRef.current = camera;
 
@@ -181,13 +181,13 @@ export function Map() {
     scene.add(directional);
 
     // Star field background
-    const starCount = 2000;
+    const starCount = 4000;
     const starGeo = new THREE.BufferGeometry();
     const starPositions = new Float32Array(starCount * 3);
     for (let si = 0; si < starCount; si++) {
-      starPositions[si * 3] = (Math.random() - 0.5) * 80;
-      starPositions[si * 3 + 1] = (Math.random() - 0.5) * 80;
-      starPositions[si * 3 + 2] = (Math.random() - 0.5) * 80;
+      starPositions[si * 3] = (Math.random() - 0.5) * 800;
+      starPositions[si * 3 + 1] = (Math.random() - 0.5) * 800;
+      starPositions[si * 3 + 2] = (Math.random() - 0.5) * 800;
     }
     starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
     const starMat = new THREE.PointsMaterial({
@@ -310,7 +310,7 @@ export function Map() {
     function onWheel(e: WheelEvent) {
       e.preventDefault();
       const delta = e.deltaY > 0 ? 1.08 : 0.92;
-      targetDist.current = Math.max(5, Math.min(50, targetDist.current * delta));
+      targetDist.current = Math.max(3, Math.min(500, targetDist.current * delta));
     }
 
     function onMouseLeave() {
@@ -667,12 +667,12 @@ export function Map() {
 
         <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-1">
           <button
-            onClick={() => { targetDist.current = Math.max(5, targetDist.current * 0.75); }}
+            onClick={() => { targetDist.current = Math.max(3, targetDist.current * 0.75); }}
             className="w-9 h-9 rounded-[10px] text-text-primary text-lg font-medium cursor-pointer flex items-center justify-center backdrop-blur-xl border border-white/[0.08] transition-all duration-200 hover:border-accent hover:text-accent"
             style={{ background: 'rgba(10, 10, 20, 0.7)' }}
           >+</button>
           <button
-            onClick={() => { targetDist.current = Math.min(50, targetDist.current * 1.35); }}
+            onClick={() => { targetDist.current = Math.min(500, targetDist.current * 1.35); }}
             className="w-9 h-9 rounded-[10px] text-text-primary text-lg font-medium cursor-pointer flex items-center justify-center backdrop-blur-xl border border-white/[0.08] transition-all duration-200 hover:border-accent hover:text-accent"
             style={{ background: 'rgba(10, 10, 20, 0.7)' }}
           >-</button>
