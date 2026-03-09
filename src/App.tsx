@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Header } from './components/Header';
 import { QuickLearn } from './components/QuickLearn';
@@ -15,6 +15,8 @@ import { Superseded } from './pages/Superseded';
 import { Login } from './pages/Login';
 import { Settings } from './pages/Settings';
 import { Playground } from './pages/Playground';
+import { Compare } from './pages/Compare';
+import { CommandPalette } from './components/CommandPalette';
 import { Map } from './pages/Map';
 import { Schedule } from './pages/Schedule';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -40,10 +42,23 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 function AppContent() {
   const location = useLocation();
   const isLoginPage = location.pathname === '/login';
+  const [showCmdK, setShowCmdK] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowCmdK(s => !s);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   return (
     <>
       {!isLoginPage && <Header />}
+      {showCmdK && <CommandPalette onClose={() => setShowCmdK(false)} />}
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<RequireAuth><Overview /></RequireAuth>} />
@@ -51,6 +66,7 @@ function AppContent() {
         <Route path="/doc/:id" element={<RequireAuth><DocDetail /></RequireAuth>} />
         <Route path="/search" element={<RequireAuth><Search /></RequireAuth>} />
         <Route path="/playground" element={<RequireAuth><Playground /></RequireAuth>} />
+        <Route path="/compare" element={<RequireAuth><Compare /></RequireAuth>} />
         <Route path="/map" element={<RequireAuth><Map /></RequireAuth>} />
         <Route path="/graph" element={<Navigate to="/map" replace />} />
         <Route path="/graph3d" element={<Navigate to="/map" replace />} />

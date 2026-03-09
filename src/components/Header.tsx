@@ -17,6 +17,7 @@ const navItems = [
 // Dropdown items (Tools)
 const toolsItems = [
   { path: '/playground', label: 'Playground' },
+  { path: '/compare', label: 'Compare Models' },
   { path: '/evolution', label: 'Evolution' },
   { path: '/traces', label: 'Traces' },
   { path: '/superseded', label: 'Superseded' },
