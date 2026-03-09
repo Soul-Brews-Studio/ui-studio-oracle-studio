@@ -21,7 +21,21 @@ const TYPE_COLORS_NUM: Record<string, number> = {
   unknown: 0x666666,
 };
 
-// Damped spring tween (from Graph.tsx pattern)
+// Globe colors — unique tint per engine
+const GLOBE_COLORS: Record<string, number> = {
+  'bge-m3': 0x6a5acd,   // slate indigo (original)
+  'nomic': 0x2dd4bf,     // teal
+  'qwen3': 0xfb923c,     // orange
+};
+
+// Triangle positions for 3 globes
+const GLOBE_POSITIONS: THREE.Vector3[] = [
+  new THREE.Vector3(0, 12, 0),       // top center
+  new THREE.Vector3(-18, -8, 0),     // bottom left
+  new THREE.Vector3(18, -8, 0),      // bottom right
+];
+
+// Damped spring tween
 function cdsTween(state: { x: number; v: number }, target: number, speed: number, dt: number) {
   const n1 = state.v - (state.x - target) * (speed * speed * dt);
   const n2 = 1 + speed * dt;
@@ -29,7 +43,6 @@ function cdsTween(state: { x: number; v: number }, target: number, speed: number
   return { x: state.x + nv * dt, v: nv };
 }
 
-// Noise functions (ported from Graph.tsx for breathing animation)
 function xxhash(seed: number, data: number): number {
   let h = ((seed + 374761393) >>> 0);
   h = ((h + (data * 3266489917 >>> 0)) >>> 0);
@@ -62,7 +75,6 @@ function fractalNoise(p: number, octaves: number, seed: number): number {
   return f / max;
 }
 
-// Age-based scale factor for node size variation
 function ageScale(createdAt: string | null): number {
   if (!createdAt) return 0.7;
   const ageMs = Date.now() - new Date(createdAt).getTime();
@@ -72,17 +84,23 @@ function ageScale(createdAt: string | null): number {
   return 0.7;
 }
 
+interface GlobeData {
+  key: string;
+  model: string;
+  count: number;
+  documents: MapDocument[];
+  center: THREE.Vector3;
+}
+
 export function Map() {
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
-  const [documents, setDocuments] = useState<MapDocument[]>([]);
+  const [globes, setGlobes] = useState<GlobeData[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeModel, setActiveModel] = useState<string | null>(null);
   const [oracleProjects, setOracleProjects] = useState<OracleProject[]>([]);
   const [totalOracles, setTotalOracles] = useState(0);
-  const [modelLoading, setModelLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [matchIds, setMatchIds] = useState<Set<string>>(new Set());
   const [hoveredDoc, setHoveredDoc] = useState<MapDocument | null>(null);
@@ -103,10 +121,10 @@ export function Map() {
   // Camera orbit state
   const camAngleX = useRef({ x: 0, v: 0 });
   const camAngleY = useRef({ x: 0.3, v: 0 });
-  const camDist = useRef({ x: 28, v: 0 });
+  const camDist = useRef({ x: 55, v: 0 });
   const targetAngleX = useRef(0);
   const targetAngleY = useRef(0.3);
-  const targetDist = useRef(28);
+  const targetDist = useRef(55);
   const camTarget = useRef(new THREE.Vector3(0, 0, 0));
   const targetCenter = useRef(new THREE.Vector3(0, 0, 0));
   const isDragging = useRef(false);
@@ -116,17 +134,57 @@ export function Map() {
   useEffect(() => { hoveredDocRef.current = hoveredDoc; }, [hoveredDoc]);
   useEffect(() => { visibleTypesRef.current = visibleTypes; }, [visibleTypes]);
 
-  // Load data
+  // Load data — fetch all models in parallel
   useEffect(() => {
     Promise.all([
-      getMap().catch(() => ({ documents: [], total: 0 })),
       getStats().catch(() => null),
       getOracles().catch(() => ({ projects: [], total_projects: 0, identities: [], total_identities: 0 })),
-    ]).then(([mapData, statsData, oraclesData]) => {
-      setDocuments(mapData.documents);
+    ]).then(async ([statsData, oraclesData]) => {
       setStats(statsData);
       setOracleProjects(oraclesData.projects);
       setTotalOracles(oraclesData.total_projects);
+
+      // Get enabled models from stats
+      const models = statsData?.vectors?.filter(v => v.enabled) || [];
+      if (models.length === 0) {
+        // Fallback: load default map
+        const mapData = await getMap().catch(() => ({ documents: [], total: 0 }));
+        setGlobes([{
+          key: 'default',
+          model: 'FTS5',
+          count: mapData.total,
+          documents: mapData.documents,
+          center: new THREE.Vector3(0, 0, 0),
+        }]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch map3d for each model in parallel
+      const results = await Promise.all(
+        models.map(async (m, i) => {
+          try {
+            const data = await getMap3d(m.key);
+            return {
+              key: m.key,
+              model: m.model,
+              count: m.count,
+              documents: data.documents,
+              center: GLOBE_POSITIONS[i % GLOBE_POSITIONS.length].clone(),
+            };
+          } catch {
+            return {
+              key: m.key,
+              model: m.model,
+              count: m.count,
+              documents: [] as MapDocument[],
+              center: GLOBE_POSITIONS[i % GLOBE_POSITIONS.length].clone(),
+            };
+          }
+        })
+      );
+
+      setGlobes(results.filter(r => r.documents.length > 0));
       setLoading(false);
     }).catch(e => {
       setError(e.message);
@@ -134,25 +192,22 @@ export function Map() {
     });
   }, []);
 
-  // Three.js scene setup
+  // Three.js scene setup — multi-globe
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || documents.length === 0) return;
+    if (!container || globes.length === 0) return;
 
     const width = container.clientWidth;
     const height = container.clientHeight;
 
-    // Scene
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x020208);
     sceneRef.current = scene;
 
-    // Camera — wider FOV, pulled back to see full cloud
     const camera = new THREE.PerspectiveCamera(70, width / height, 0.1, 2000);
-    camera.position.z = 16;
+    camera.position.z = 55;
     cameraRef.current = camera;
 
-    // Renderer — tone mapping for bloom
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -161,26 +216,23 @@ export function Map() {
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Post-processing: bloom
     const composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(width, height),
       0.8,   // strength
       0.4,   // radius
-      0.2,   // threshold — low so emissive nodes glow
+      0.2,   // threshold
     );
     composer.addPass(bloomPass);
 
-    // Lighting — dimmer, let emissive + bloom carry the look
     const ambient = new THREE.AmbientLight(0x404060, 0.4);
     scene.add(ambient);
-
     const directional = new THREE.DirectionalLight(0xffffff, 0.6);
     directional.position.set(5, 5, 5);
     scene.add(directional);
 
-    // Star field background
+    // Star field
     const starCount = 4000;
     const starGeo = new THREE.BufferGeometry();
     const starPositions = new Float32Array(starCount * 3);
@@ -190,60 +242,74 @@ export function Map() {
       starPositions[si * 3 + 2] = (Math.random() - 0.5) * 800;
     }
     starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-    const starMat = new THREE.PointsMaterial({
-      color: 0xffffff,
-      size: 0.04,
-      transparent: true,
-      opacity: 0.6,
-    });
+    const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.04, transparent: true, opacity: 0.6 });
     const stars = new THREE.Points(starGeo, starMat);
     scene.add(stars);
 
-    // Wireframe globe — subtle reference frame
-    const globeRadius = 10;
-    const globeGeometry = new THREE.SphereGeometry(globeRadius, 32, 24);
-    const globeWireframe = new THREE.WireframeGeometry(globeGeometry);
-    const globeMaterial = new THREE.LineBasicMaterial({
-      color: 0x6a5acd,
-      opacity: 0.06,
-      transparent: true,
-    });
-    const globeMesh = new THREE.LineSegments(globeWireframe, globeMaterial);
-    scene.add(globeMesh);
-
-    // Node geometry (shared)
+    // Shared geometry
     const nodeGeometry = new THREE.SphereGeometry(0.05, 10, 10);
     const meshes: THREE.Mesh[] = [];
-
-    // Reduced motion preference
+    const globeMeshes: THREE.LineSegments[] = [];
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    // Position nodes — spread across full globe volume
-    documents.forEach((doc, i) => {
-      const color = TYPE_COLORS_NUM[doc.type] || TYPE_COLORS_NUM.unknown;
-      const baseScale = ageScale(doc.created_at);
-      const material = new THREE.MeshStandardMaterial({
-        color,
-        metalness: 0.3,
-        roughness: 0.2,
-        emissive: color,
-        emissiveIntensity: 0.8,
+    // Create globes and their document clouds
+    globes.forEach((globe) => {
+      const globeColor = GLOBE_COLORS[globe.key] || 0x6a5acd;
+      const globeRadius = 8;
+      const globeGeometry = new THREE.SphereGeometry(globeRadius, 32, 24);
+      const globeWireframe = new THREE.WireframeGeometry(globeGeometry);
+      const globeMaterial = new THREE.LineBasicMaterial({
+        color: globeColor,
+        opacity: 0.08,
         transparent: true,
-        opacity: 1.0,
       });
+      const globeMesh = new THREE.LineSegments(globeWireframe, globeMaterial);
+      globeMesh.position.copy(globe.center);
+      scene.add(globeMesh);
+      globeMeshes.push(globeMesh);
 
-      const mesh = new THREE.Mesh(nodeGeometry, material);
-      // Use real z from PCA when available, fall back to xxhash
-      const z = doc.z != null ? doc.z : (xxhash(7, i) - 0.5) * 2;
-      const basePos = new THREE.Vector3(
-        doc.x * 8,
-        doc.y * 8,
-        z * 5,
-      );
-      mesh.position.copy(basePos);
-      mesh.userData = { doc, basePos, baseScale };
-      scene.add(mesh);
-      meshes.push(mesh);
+      // Connection lines between globes (subtle)
+      if (globes.length > 1) {
+        globes.forEach((other) => {
+          if (other.key <= globe.key) return; // avoid duplicates
+          const lineGeo = new THREE.BufferGeometry().setFromPoints([
+            globe.center, other.center,
+          ]);
+          const lineMat = new THREE.LineBasicMaterial({
+            color: 0x333355,
+            opacity: 0.15,
+            transparent: true,
+          });
+          scene.add(new THREE.Line(lineGeo, lineMat));
+        });
+      }
+
+      // Nodes for this globe
+      globe.documents.forEach((doc, i) => {
+        const color = TYPE_COLORS_NUM[doc.type] || TYPE_COLORS_NUM.unknown;
+        const baseScale = ageScale(doc.created_at);
+        const material = new THREE.MeshStandardMaterial({
+          color,
+          metalness: 0.3,
+          roughness: 0.2,
+          emissive: color,
+          emissiveIntensity: 0.8,
+          transparent: true,
+          opacity: 1.0,
+        });
+
+        const mesh = new THREE.Mesh(nodeGeometry, material);
+        const z = doc.z != null ? doc.z : (xxhash(7, i) - 0.5) * 2;
+        const basePos = new THREE.Vector3(
+          globe.center.x + doc.x * 8,
+          globe.center.y + doc.y * 8,
+          globe.center.z + z * 5,
+        );
+        mesh.position.copy(basePos);
+        mesh.userData = { doc, basePos, baseScale, globeKey: globe.key };
+        scene.add(mesh);
+        meshes.push(mesh);
+      });
     });
     meshesRef.current = meshes;
 
@@ -251,7 +317,6 @@ export function Map() {
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2(10, 10);
 
-    // Mouse handlers
     function onMouseDown(e: MouseEvent) {
       isDragging.current = true;
       dragStart.current = { x: e.clientX, y: e.clientY };
@@ -263,7 +328,6 @@ export function Map() {
       const wasDrag = Math.abs(dx) > 3 || Math.abs(dy) > 3;
 
       if (!wasDrag) {
-        // Click — check for node
         const rect = container!.getBoundingClientRect();
         mouse.x = ((e.clientX - rect.left) / width) * 2 - 1;
         mouse.y = -((e.clientY - rect.top) / height) * 2 + 1;
@@ -279,7 +343,6 @@ export function Map() {
 
     function onMouseMove(e: MouseEvent) {
       const rect = container!.getBoundingClientRect();
-      // Always track NDC for dock magnification
       mouseNDC.current.x = ((e.clientX - rect.left) / width) * 2 - 1;
       mouseNDC.current.y = -((e.clientY - rect.top) / height) * 2 + 1;
 
@@ -291,7 +354,6 @@ export function Map() {
         return;
       }
 
-      // Hover detection
       mouse.x = mouseNDC.current.x;
       mouse.y = mouseNDC.current.y;
       raycaster.setFromCamera(mouse, camera);
@@ -316,7 +378,7 @@ export function Map() {
     function onMouseLeave() {
       isDragging.current = false;
       setHoveredDoc(null);
-      mouseNDC.current.set(10, 10); // move offscreen
+      mouseNDC.current.set(10, 10);
     }
 
     container.addEventListener('mousedown', onMouseDown);
@@ -325,7 +387,6 @@ export function Map() {
     container.addEventListener('wheel', onWheel, { passive: false });
     container.addEventListener('mouseleave', onMouseLeave);
 
-    // Resize handler
     function onResize() {
       const w = container!.clientWidth;
       const h = container!.clientHeight;
@@ -336,7 +397,7 @@ export function Map() {
     }
     window.addEventListener('resize', onResize);
 
-    // Proximity label pool (imperatively managed for perf)
+    // Proximity label pool
     const LABEL_POOL_SIZE = 8;
     const labelPool: HTMLDivElement[] = [];
     const labelsContainer = labelsRef.current;
@@ -348,6 +409,18 @@ export function Map() {
         labelsContainer.appendChild(el);
         labelPool.push(el);
       }
+    }
+
+    // Globe label overlays (HTML)
+    const globeLabelEls: HTMLDivElement[] = [];
+    if (labelsContainer) {
+      globes.forEach((globe) => {
+        const el = document.createElement('div');
+        el.style.cssText = 'position:absolute;font-size:11px;font-family:monospace;color:rgba(255,255,255,0.5);pointer-events:none;text-transform:uppercase;letter-spacing:2px;white-space:nowrap;';
+        el.textContent = `${globe.key} · ${globe.documents.length.toLocaleString()}`;
+        labelsContainer.appendChild(el);
+        globeLabelEls.push(el);
+      });
     }
 
     // FPS counter
@@ -367,7 +440,6 @@ export function Map() {
     function animate() {
       time += 0.016;
 
-      // FPS
       fpsFrames++;
       const now = performance.now();
       if (now - fpsLastTime >= 1000) {
@@ -376,25 +448,24 @@ export function Map() {
         fpsLastTime = now;
       }
 
-      // Slow celestial rotation when not dragging
       if (!isDragging.current && !prefersReduced) {
-        targetAngleX.current += 0.0005;
+        targetAngleX.current += 0.0003;
       }
 
-      // Smooth camera orbit
       camAngleX.current = cdsTween(camAngleX.current, targetAngleX.current, 3, dt);
       camAngleY.current = cdsTween(camAngleY.current, targetAngleY.current, 3, dt);
       camDist.current = cdsTween(camDist.current, targetDist.current, 4, dt);
 
       const dist = camDist.current.x;
 
-      // Scale bloom down when zoomed out (dist > 20), up when close
+      // Scale bloom by distance
       const bloomScale = Math.max(0.1, Math.min(1.0, 18 / dist));
       bloomPass.strength = 0.8 * bloomScale;
+
       camera.position.x = Math.sin(camAngleX.current.x) * Math.cos(camAngleY.current.x) * dist;
       camera.position.y = Math.sin(camAngleY.current.x) * dist;
       camera.position.z = Math.cos(camAngleX.current.x) * Math.cos(camAngleY.current.x) * dist;
-      // Smooth pan to target center
+
       camTarget.current.lerp(targetCenter.current, 0.05);
       const ct = camTarget.current;
       camera.position.x += ct.x;
@@ -402,11 +473,32 @@ export function Map() {
       camera.position.z += ct.z;
       camera.lookAt(ct.x, ct.y, ct.z);
 
-      // Globe slow rotation
-      globeMesh.rotation.y = time * 0.02;
-      globeMesh.rotation.x = time * 0.005;
+      // Rotate each globe
+      globeMeshes.forEach((gm, gi) => {
+        gm.rotation.y = time * 0.02 + gi * 0.7;
+        gm.rotation.x = time * 0.005 + gi * 0.3;
+      });
 
-      // Update node materials based on search/hover + breathing + dock magnification
+      // Update globe labels position
+      globes.forEach((globe, gi) => {
+        if (gi < globeLabelEls.length) {
+          tempVec.copy(globe.center);
+          tempVec.y -= 10.5; // below globe
+          tempVec.project(camera);
+          if (tempVec.z < 1) {
+            const px = (tempVec.x + 1) * 0.5 * width;
+            const py = (1 - (tempVec.y + 1) * 0.5) * height;
+            globeLabelEls[gi].style.left = `${px}px`;
+            globeLabelEls[gi].style.top = `${py}px`;
+            globeLabelEls[gi].style.transform = 'translate(-50%, 0)';
+            globeLabelEls[gi].style.display = '';
+          } else {
+            globeLabelEls[gi].style.display = 'none';
+          }
+        }
+      });
+
+      // Update nodes
       const matches = matchIdsRef.current;
       const hasSearch = matches.size > 0;
       const hovered = hoveredDocRef.current;
@@ -414,7 +506,6 @@ export function Map() {
       const mx = mouseNDC.current.x;
       const my = mouseNDC.current.y;
 
-      // Collect nearby nodes for proximity labels
       const nearby: { screenDist: number; ndcX: number; ndcY: number; doc: MapDocument; color: string }[] = [];
 
       meshes.forEach((mesh, i) => {
@@ -426,11 +517,9 @@ export function Map() {
         const isMatched = hasSearch && (matches.has(doc.id) || (doc.chunk_ids?.some(cid => matches.has(cid)) ?? false));
         const isFaded = hasSearch && !isMatched;
 
-        // Hide filtered-out types
         mesh.visible = !isHidden;
         if (isHidden) return;
 
-        // Breathing — gentle per-axis drift (galaxy float, not atomic pulse)
         if (!prefersReduced) {
           const t = time * 0.15;
           const dx = fractalNoise(t + i * 0.17, 2, 42) * 0.12;
@@ -439,7 +528,6 @@ export function Map() {
           mesh.position.set(basePos.x + dx, basePos.y + dy, basePos.z + dz);
         }
 
-        // Dock magnification — smooth proximity swell
         tempVec.copy(mesh.position).project(camera);
         const screenDist = Math.sqrt(
           Math.pow((tempVec.x - mx) * aspectRatio, 2) +
@@ -450,12 +538,10 @@ export function Map() {
           ? 1 + 0.6 * Math.pow(1 - screenDist / magnifyRadius, 2)
           : 1;
 
-        // Scale: age-based × magnification × search boost
         let scale = baseScale * magnifyFactor;
         if (isMatched) scale *= 1.4;
         mesh.scale.setScalar(scale);
 
-        // Dynamic emissive glow — proximity + search state
         const baseGlow = isFaded ? 0.1 : 0.5;
         mat.emissiveIntensity = baseGlow + (magnifyFactor - 1) * 0.6;
         if (isMatched) mat.emissiveIntensity = 1.0;
@@ -463,7 +549,6 @@ export function Map() {
 
         mat.opacity = isFaded ? 0.05 : 1.0;
 
-        // Track nearby nodes for labels (skip faded)
         if (!isFaded && screenDist < 0.5 && tempVec.z < 1) {
           nearby.push({
             screenDist,
@@ -475,7 +560,6 @@ export function Map() {
         }
       });
 
-      // Position proximity labels
       nearby.sort((a, b) => a.screenDist - b.screenDist);
       for (let li = 0; li < labelPool.length; li++) {
         const el = labelPool[li];
@@ -505,6 +589,7 @@ export function Map() {
       cancelAnimationFrame(animRef.current);
       fpsEl.remove();
       labelPool.forEach(el => el.remove());
+      globeLabelEls.forEach(el => el.remove());
       container.removeEventListener('mousedown', onMouseDown);
       container.removeEventListener('mouseup', onMouseUp);
       container.removeEventListener('mousemove', onMouseMove);
@@ -517,11 +602,11 @@ export function Map() {
         scene.remove(mesh);
       });
       nodeGeometry.dispose();
-      globeWireframe.dispose();
-      globeGeometry.dispose();
-      globeMaterial.dispose();
-      starGeo.dispose();
-      starMat.dispose();
+      // Dispose globe geometries
+      scene.traverse((obj) => {
+        if ((obj as any).geometry) (obj as any).geometry.dispose();
+        if ((obj as any).material) (obj as any).material.dispose();
+      });
       composer.dispose();
 
       if (container.contains(renderer.domElement)) {
@@ -529,22 +614,7 @@ export function Map() {
       }
       renderer.dispose();
     };
-  }, [documents, navigate]);
-
-  // Switch embedding model — reload map from real embeddings
-  async function switchModel(key: string) {
-    if (modelLoading) return;
-    setModelLoading(true);
-    setActiveModel(key);
-    try {
-      const data = await getMap3d(key);
-      setDocuments(data.documents);
-    } catch (e: any) {
-      console.error('Failed to load model:', e);
-    } finally {
-      setModelLoading(false);
-    }
-  }
+  }, [globes, navigate]);
 
   // Search
   async function handleSearch(e: React.FormEvent) {
@@ -562,9 +632,21 @@ export function Map() {
     }
   }
 
-  // Type counts
-  const typeCounts = documents.reduce((acc, d) => {
-    acc[d.type] = (acc[d.type] || 0) + 1;
+  // Fly to a specific globe
+  function flyToGlobe(index: number) {
+    if (index < globes.length) {
+      const center = globes[index].center;
+      targetCenter.current.set(center.x, center.y, center.z);
+      targetDist.current = 18;
+    }
+  }
+
+  // Total documents across all globes
+  const totalDocs = globes.reduce((sum, g) => sum + g.documents.length, 0);
+
+  // Type counts across all globes
+  const typeCounts = globes.reduce((acc, g) => {
+    g.documents.forEach(d => { acc[d.type] = (acc[d.type] || 0) + 1; });
     return acc;
   }, {} as Record<string, number>);
 
@@ -572,7 +654,7 @@ export function Map() {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)] gap-3">
         <div className="text-lg text-text-primary">Loading knowledge map...</div>
-        <div className="text-[13px] text-text-muted">Computing 3D projection from embeddings</div>
+        <div className="text-[13px] text-text-muted">Fetching embeddings from all engines...</div>
       </div>
     );
   }
@@ -613,11 +695,11 @@ export function Map() {
         <div ref={containerRef} className="w-full h-full cursor-grab active:cursor-grabbing" style={{ background: '#05050a' }} />
         <div ref={labelsRef} className="absolute inset-0 pointer-events-none z-[5] overflow-hidden" />
 
-        {documents.length === 0 && (
+        {totalDocs === 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center z-[5] gap-3" style={{ background: 'rgba(5, 5, 10, 0.9)' }}>
             <div className="text-[22px] font-bold text-text-primary">No Embeddings Yet</div>
             <div className="text-sm text-text-muted text-center leading-relaxed">
-              The 3D map requires vector embeddings from ChromaDB.<br />
+              The 3D map requires vector embeddings from LanceDB.<br />
               Run a vector index to populate the map.
             </div>
           </div>
@@ -680,25 +762,19 @@ export function Map() {
             onClick={() => {
               targetAngleX.current = 0;
               targetAngleY.current = 0.3;
-              targetDist.current = 28;
+              targetDist.current = 55;
               targetCenter.current.set(0, 0, 0);
             }}
             className="w-9 h-9 rounded-[10px] text-text-primary text-lg font-medium cursor-pointer flex items-center justify-center backdrop-blur-xl border border-white/[0.08] transition-all duration-200 hover:border-accent hover:text-accent"
             style={{ background: 'rgba(10, 10, 20, 0.7)' }}
-            title="Reset view"
+            title="Reset view (all globes)"
           >R</button>
           <button
             onClick={() => {
-              // Compute centroid of visible meshes
               const meshes = meshesRef.current;
               let cx = 0, cy = 0, cz = 0, count = 0;
               meshes.forEach(m => {
-                if (m.visible) {
-                  cx += m.position.x;
-                  cy += m.position.y;
-                  cz += m.position.z;
-                  count++;
-                }
+                if (m.visible) { cx += m.position.x; cy += m.position.y; cz += m.position.z; count++; }
               });
               if (count > 0) {
                 targetCenter.current.set(cx / count, cy / count, cz / count);
@@ -714,10 +790,7 @@ export function Map() {
 
       <div className="w-[260px] bg-bg-card border-l border-border p-6 flex flex-col overflow-hidden">
         <h2 className="text-xl font-bold text-text-primary mb-1">Knowledge Map</h2>
-        {activeModel && (
-          <span className="text-[11px] font-mono text-accent mb-4 block">viewing: {activeModel}</span>
-        )}
-        {!activeModel && <div className="mb-4" />}
+        <span className="text-[11px] font-mono text-text-muted mb-4 block">{globes.length} engine{globes.length !== 1 ? 's' : ''} loaded</span>
         <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-y-auto">
           {stats?.total && (
             <div className="flex flex-col gap-0.5">
@@ -726,18 +799,9 @@ export function Map() {
             </div>
           )}
           <div className="flex flex-col gap-0.5">
-            <span className="text-xl font-bold text-text-primary tabular-nums">{documents.length.toLocaleString()}</span>
+            <span className="text-xl font-bold text-text-primary tabular-nums">{totalDocs.toLocaleString()}</span>
             <span className="text-xs text-text-muted">Documents Mapped</span>
           </div>
-          {activeModel && stats?.vectors && (() => {
-            const mv = stats.vectors!.find(v => v.key === activeModel);
-            return mv ? (
-              <div className="flex flex-col gap-0.5">
-                <span className="text-xl font-bold text-accent tabular-nums">{mv.count.toLocaleString()}</span>
-                <span className="text-xs text-text-muted">Vectors ({mv.model})</span>
-              </div>
-            ) : null;
-          })()}
           {Object.entries(typeCounts).map(([type, count]) => {
             const chunks = stats?.by_type?.[type];
             return (
@@ -749,48 +813,34 @@ export function Map() {
               </div>
             );
           })}
-          {stats?.vectors && stats.vectors.length > 0 ? (
+          {globes.length > 0 && (
             <>
               <div className="h-px bg-border my-1" />
               <div className="flex items-center justify-between">
-                <span className="text-xs font-mono uppercase tracking-wide text-text-muted">Embedding Models</span>
+                <span className="text-xs font-mono uppercase tracking-wide text-text-muted">Embedding Globes</span>
                 <span className="text-[9px] font-mono text-text-muted">LanceDB</span>
               </div>
-              {stats.vectors.map(v => {
-                const isSelected = activeModel === v.key;
+              {globes.map((globe, gi) => {
+                const globeColor = `#${(GLOBE_COLORS[globe.key] || 0x6a5acd).toString(16).padStart(6, '0')}`;
                 return (
                   <button
-                    key={v.key}
-                    onClick={() => v.enabled && switchModel(v.key)}
-                    disabled={!v.enabled || modelLoading}
-                    className={`flex flex-col gap-0.5 p-2 rounded-lg border text-left transition-all duration-150 ${
-                      isSelected
-                        ? 'border-accent bg-accent/10'
-                        : v.enabled
-                          ? 'border-border bg-white/[0.02] hover:border-border-hover cursor-pointer'
-                          : 'border-border-subtle opacity-50 cursor-not-allowed'
-                    }`}
+                    key={globe.key}
+                    onClick={() => flyToGlobe(gi)}
+                    className="flex flex-col gap-0.5 p-2 rounded-lg border border-border bg-white/[0.02] hover:border-border-hover cursor-pointer text-left transition-all duration-150"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-text-primary">{v.key}</span>
-                      <span className={`text-[9px] font-mono font-semibold uppercase px-1.5 py-0.5 rounded ${
-                        isSelected ? 'bg-accent/20 text-accent' : v.enabled ? 'bg-success/20 text-success' : 'bg-red-500/20 text-red-400'
-                      }`}>
-                        {isSelected ? (modelLoading ? 'Loading' : 'Viewing') : v.enabled ? `${v.count.toLocaleString()}` : 'Offline'}
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ background: globeColor }} />
+                        <span className="text-sm font-semibold text-text-primary">{globe.key}</span>
+                      </div>
+                      <span className="text-[9px] font-mono font-semibold uppercase px-1.5 py-0.5 rounded bg-success/20 text-success">
+                        {globe.documents.length.toLocaleString()}
                       </span>
                     </div>
-                    <span className="text-xs text-text-muted font-mono">{v.model}</span>
+                    <span className="text-xs text-text-muted font-mono ml-[18px]">{globe.model}</span>
                   </button>
                 );
               })}
-            </>
-          ) : stats?.vector && (
-            <>
-              <div className="h-px bg-border my-1" />
-              <div className="flex flex-col gap-0.5">
-                <span className="text-xl font-bold text-text-primary tabular-nums">{stats.vector.count.toLocaleString()}</span>
-                <span className="text-xs text-text-muted capitalize">Embeddings</span>
-              </div>
             </>
           )}
           {totalOracles > 0 && (
@@ -834,7 +884,7 @@ export function Map() {
           )}
         </div>
         <div className="text-[11px] text-text-muted mt-6 leading-relaxed">
-          Drag to orbit. Scroll to zoom. Click a node to view.
+          Drag to orbit. Scroll to zoom. Click globe in sidebar to fly.
         </div>
       </div>
     </div>
