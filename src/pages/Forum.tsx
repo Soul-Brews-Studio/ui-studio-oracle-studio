@@ -96,7 +96,7 @@ export function Forum() {
   return (
     <div className="flex max-w-[1200px] mx-auto p-6 gap-6 max-md:flex-col max-md:p-3 max-md:gap-0">
       {/* Sidebar — hidden on mobile when thread is selected */}
-      <div className={`w-[220px] shrink-0 flex flex-col max-md:w-full ${selected ? 'max-md:hidden' : ''}`}>
+      <div className={`w-[180px] shrink-0 flex flex-col max-md:w-full ${selected ? 'max-md:hidden' : ''}`}>
         <div className="flex justify-between items-center mb-3">
           <h2 className="text-xs font-mono uppercase tracking-wide text-text-muted">Threads</h2>
           <button

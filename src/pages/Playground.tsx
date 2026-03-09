@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { search } from '../api/oracle';
 import type { Document } from '../api/oracle';
-import styles from './Playground.module.css';
 
 interface ColumnResult {
   results: Document[];
@@ -97,39 +96,53 @@ export function Playground() {
   const maxTime = Math.max(ftsCol?.time || 0, vectorCol?.time || 0, hybridCol?.time || 0, 1);
 
   return (
-    <div className={styles.container}>
+    <div className="min-h-[calc(100vh-64px)]">
       {/* Pre-search landing */}
       {!searched && !loading && (
-        <div className={styles.landing}>
-          <h1 className={styles.landingTitle}>Vector Playground</h1>
-          <p className={styles.landingSubtitle}>Compare search modes side-by-side</p>
+        <div className="max-w-[800px] mx-auto py-20 px-6 text-center">
+          <h1 className="text-5xl max-md:text-[32px] font-extrabold mb-2 bg-gradient-to-br from-[#60a5fa] via-[#a78bfa] to-[#4ade80] bg-clip-text text-transparent animate-[gradientShift_4s_ease-in-out_infinite] bg-[length:200%_200%]">Vector Playground</h1>
+          <p className="text-base text-text-muted mb-10">Compare search modes side-by-side</p>
 
-          <form onSubmit={handleSubmit} className={styles.form}>
+          <form onSubmit={handleSubmit} className="flex gap-3 max-w-[640px] mx-auto mb-6">
             <input
               type="text"
               value={query}
               onChange={e => setQuery(e.target.value)}
               placeholder="Type a query to compare FTS, Vector, and Hybrid..."
-              className={styles.input}
+              className="flex-1 py-3.5 px-[18px] rounded-[10px] text-[15px] text-text-primary border border-border outline-none focus:border-accent transition-colors duration-200 placeholder:text-text-muted backdrop-blur-lg [&::-webkit-search-cancel-button]:hidden [&::-webkit-clear-button]:hidden [&::-ms-clear]:hidden"
+              style={{ WebkitAppearance: 'none', background: 'rgba(20, 20, 35, 0.6)' }}
               autoFocus
             />
-            <button type="submit" className={styles.button} disabled={loading}>
+            <button
+              type="submit"
+              className="bg-accent border-none text-white py-3.5 px-7 rounded-[10px] text-[15px] font-semibold cursor-pointer transition-all duration-200 whitespace-nowrap hover:bg-accent-hover hover:scale-[1.02] disabled:opacity-60 disabled:cursor-not-allowed"
+              disabled={loading}
+            >
               Compare
             </button>
           </form>
 
-          <div className={styles.modeCards}>
-            <div className={`${styles.modeCard} ${styles.modeCardFts}`}>
-              <div className={styles.modeIcon}>FTS5</div>
-              <p className={styles.modeDesc}>Full-text search using SQLite's FTS5 engine. Fast keyword matching with ranking.</p>
+          <div className="grid grid-cols-3 max-md:grid-cols-1 gap-4 mt-10">
+            <div
+              className="rounded-[14px] py-7 px-6 text-left backdrop-blur-lg cursor-default transition-all duration-300 hover:-translate-y-0.5 hover:border-[rgba(96,165,250,0.4)] hover:shadow-[0_0_24px_rgba(96,165,250,0.08)]"
+              style={{ background: 'rgba(20, 20, 35, 0.6)', border: '1px solid rgba(255, 255, 255, 0.06)' }}
+            >
+              <div className="text-xl font-extrabold mb-2.5" style={{ color: '#60a5fa' }}>FTS5</div>
+              <p className="text-[13px] text-text-secondary leading-relaxed">Full-text search using SQLite's FTS5 engine. Fast keyword matching with ranking.</p>
             </div>
-            <div className={`${styles.modeCard} ${styles.modeCardVector}`}>
-              <div className={styles.modeIcon}>Vector</div>
-              <p className={styles.modeDesc}>Semantic search using ChromaDB embeddings. Finds conceptually similar results.</p>
+            <div
+              className="rounded-[14px] py-7 px-6 text-left backdrop-blur-lg cursor-default transition-all duration-300 hover:-translate-y-0.5 hover:border-[rgba(167,139,250,0.4)] hover:shadow-[0_0_24px_rgba(167,139,250,0.08)]"
+              style={{ background: 'rgba(20, 20, 35, 0.6)', border: '1px solid rgba(255, 255, 255, 0.06)' }}
+            >
+              <div className="text-xl font-extrabold mb-2.5" style={{ color: '#a78bfa' }}>Vector</div>
+              <p className="text-[13px] text-text-secondary leading-relaxed">Semantic search using ChromaDB embeddings. Finds conceptually similar results.</p>
             </div>
-            <div className={`${styles.modeCard} ${styles.modeCardHybrid}`}>
-              <div className={styles.modeIcon}>Hybrid</div>
-              <p className={styles.modeDesc}>Best of both. Combines results and boosts docs found by both engines.</p>
+            <div
+              className="rounded-[14px] py-7 px-6 text-left backdrop-blur-lg cursor-default transition-all duration-300 hover:-translate-y-0.5 hover:border-[rgba(74,222,128,0.4)] hover:shadow-[0_0_24px_rgba(74,222,128,0.08)]"
+              style={{ background: 'rgba(20, 20, 35, 0.6)', border: '1px solid rgba(255, 255, 255, 0.06)' }}
+            >
+              <div className="text-xl font-extrabold mb-2.5" style={{ color: '#4ade80' }}>Hybrid</div>
+              <p className="text-[13px] text-text-secondary leading-relaxed">Best of both. Combines results and boosts docs found by both engines.</p>
             </div>
           </div>
         </div>
@@ -137,28 +150,33 @@ export function Playground() {
 
       {/* Post-search view */}
       {(searched || loading) && (
-        <div className={styles.resultsView}>
-          <form onSubmit={handleSubmit} className={styles.form}>
+        <div className="max-w-[1200px] mx-auto py-8 px-6">
+          <form onSubmit={handleSubmit} className="flex gap-3 max-w-[640px] mx-auto mb-6">
             <input
               type="text"
               value={query}
               onChange={e => setQuery(e.target.value)}
               placeholder="Search query..."
-              className={styles.input}
+              className="flex-1 py-3.5 px-[18px] rounded-[10px] text-[15px] text-text-primary border border-border outline-none focus:border-accent transition-colors duration-200 placeholder:text-text-muted backdrop-blur-lg [&::-webkit-search-cancel-button]:hidden [&::-webkit-clear-button]:hidden [&::-ms-clear]:hidden"
+              style={{ WebkitAppearance: 'none', background: 'rgba(20, 20, 35, 0.6)' }}
               autoFocus
             />
-            <button type="submit" className={styles.button} disabled={loading}>
+            <button
+              type="submit"
+              className="bg-accent border-none text-white py-3.5 px-7 rounded-[10px] text-[15px] font-semibold cursor-pointer transition-all duration-200 whitespace-nowrap hover:bg-accent-hover hover:scale-[1.02] disabled:opacity-60 disabled:cursor-not-allowed"
+              disabled={loading}
+            >
               {loading ? 'Searching...' : 'Compare'}
             </button>
           </form>
 
           {loading && (
-            <div className={styles.skeletonContainer}>
+            <div className="grid grid-cols-3 max-md:grid-cols-1 gap-4 mt-6">
               {[0, 1, 2].map(i => (
-                <div key={i} className={styles.skeletonColumn}>
-                  <div className={styles.skeletonHeader} />
+                <div key={i} className="flex flex-col gap-2">
+                  <div className="h-16 rounded-[10px] bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite]" style={{ background: 'linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.03) 75%)', backgroundSize: '200% 100%' }} />
                   {[0, 1, 2, 3, 4].map(j => (
-                    <div key={j} className={styles.skeletonCard} style={{ animationDelay: `${j * 80}ms` }} />
+                    <div key={j} className="h-20 rounded-[10px] bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite]" style={{ background: 'linear-gradient(90deg, rgba(255,255,255,0.02) 25%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.02) 75%)', backgroundSize: '200% 100%', animationDelay: `${j * 80}ms` }} />
                   ))}
                 </div>
               ))}
@@ -175,7 +193,7 @@ export function Playground() {
                 maxTime={maxTime}
               />
 
-              <div className={styles.columns}>
+              <div className="grid grid-cols-3 max-md:grid-cols-1 gap-4">
                 <Column
                   title="FTS5"
                   color="#60a5fa"
@@ -231,59 +249,62 @@ function SummaryBar({
   const sharedAnim = useCountUp(sharedCount);
 
   return (
-    <div className={styles.summaryBar}>
-      <div className={styles.summaryStats}>
-        <div className={styles.summaryStat}>
-          <span className={styles.summaryNum} style={{ color: '#60a5fa' }}>{ftsCount}</span>
-          <span className={styles.summaryLabel}>FTS</span>
-          <div className={styles.timingBar}>
+    <div
+      className="flex max-md:flex-col items-center gap-6 py-4 px-6 rounded-xl mb-5 backdrop-blur-lg"
+      style={{ background: 'rgba(20, 20, 35, 0.6)', border: '1px solid rgba(255, 255, 255, 0.06)' }}
+    >
+      <div className="flex-1 flex max-md:w-full gap-6">
+        <div className="flex-1 flex flex-col gap-0.5">
+          <span className="text-[28px] font-extrabold leading-none tabular-nums" style={{ color: '#60a5fa' }}>{ftsCount}</span>
+          <span className="text-[11px] text-text-muted uppercase tracking-wide mb-1">FTS</span>
+          <div className="h-[3px] rounded-sm overflow-hidden" style={{ background: 'rgba(255, 255, 255, 0.05)' }}>
             <div
-              className={styles.timingFill}
+              className="h-full rounded-sm transition-[width] duration-500 ease-out"
               style={{
                 width: `${((fts?.time || 0) / maxTime) * 100}%`,
                 background: '#60a5fa',
               }}
             />
           </div>
-          <span className={styles.timingMs}>{fts?.time || 0}ms</span>
+          <span className="text-[10px] text-text-muted tabular-nums">{fts?.time || 0}ms</span>
         </div>
 
-        <div className={styles.summaryStat}>
-          <span className={styles.summaryNum} style={{ color: '#a78bfa' }}>{vecCount}</span>
-          <span className={styles.summaryLabel}>Vector</span>
-          <div className={styles.timingBar}>
+        <div className="flex-1 flex flex-col gap-0.5">
+          <span className="text-[28px] font-extrabold leading-none tabular-nums" style={{ color: '#a78bfa' }}>{vecCount}</span>
+          <span className="text-[11px] text-text-muted uppercase tracking-wide mb-1">Vector</span>
+          <div className="h-[3px] rounded-sm overflow-hidden" style={{ background: 'rgba(255, 255, 255, 0.05)' }}>
             <div
-              className={styles.timingFill}
+              className="h-full rounded-sm transition-[width] duration-500 ease-out"
               style={{
                 width: `${((vector?.time || 0) / maxTime) * 100}%`,
                 background: '#a78bfa',
               }}
             />
           </div>
-          <span className={styles.timingMs}>{vector?.time || 0}ms</span>
+          <span className="text-[10px] text-text-muted tabular-nums">{vector?.time || 0}ms</span>
         </div>
 
-        <div className={styles.summaryStat}>
-          <span className={styles.summaryNum} style={{ color: '#4ade80' }}>{hybCount}</span>
-          <span className={styles.summaryLabel}>Hybrid</span>
-          <div className={styles.timingBar}>
+        <div className="flex-1 flex flex-col gap-0.5">
+          <span className="text-[28px] font-extrabold leading-none tabular-nums" style={{ color: '#4ade80' }}>{hybCount}</span>
+          <span className="text-[11px] text-text-muted uppercase tracking-wide mb-1">Hybrid</span>
+          <div className="h-[3px] rounded-sm overflow-hidden" style={{ background: 'rgba(255, 255, 255, 0.05)' }}>
             <div
-              className={styles.timingFill}
+              className="h-full rounded-sm transition-[width] duration-500 ease-out"
               style={{
                 width: `${((hybrid?.time || 0) / maxTime) * 100}%`,
                 background: '#4ade80',
               }}
             />
           </div>
-          <span className={styles.timingMs}>{hybrid?.time || 0}ms</span>
+          <span className="text-[10px] text-text-muted tabular-nums">{hybrid?.time || 0}ms</span>
         </div>
       </div>
 
       {/* Venn overlap indicator */}
-      <div className={styles.vennContainer}>
-        <div className={styles.vennCircles}>
+      <div className="flex flex-col items-center gap-1 min-w-[90px]">
+        <div className="flex items-center">
           <div
-            className={styles.vennCircle}
+            className="rounded-full shrink-0 transition-all duration-300"
             style={{
               background: 'rgba(96, 165, 250, 0.15)',
               border: '1.5px solid rgba(96, 165, 250, 0.4)',
@@ -292,17 +313,16 @@ function SummaryBar({
             }}
           />
           <div
-            className={styles.vennCircle}
+            className="rounded-full shrink-0 -ml-3 transition-all duration-300"
             style={{
               background: 'rgba(167, 139, 250, 0.15)',
               border: '1.5px solid rgba(167, 139, 250, 0.4)',
               width: `${Math.max(28, Math.min(56, (vector?.results.length || 0) * 3))}px`,
               height: `${Math.max(28, Math.min(56, (vector?.results.length || 0) * 3))}px`,
-              marginLeft: '-12px',
             }}
           />
         </div>
-        <span className={styles.vennLabel}>{sharedAnim} shared</span>
+        <span className="text-[11px] text-text-muted tabular-nums">{sharedAnim} shared</span>
       </div>
     </div>
   );
@@ -324,22 +344,25 @@ function Column({
   if (!data) return null;
 
   return (
-    <div className={styles.column}>
-      <div className={styles.columnHeader}>
-        <div className={styles.columnGlow} style={{ background: `linear-gradient(90deg, ${color}, transparent)` }} />
-        <span className={styles.columnTitle} style={{ color }}>{title}</span>
-        <div className={styles.columnStats}>
-          <span className={styles.columnStatBig}>{data.results.length}</span>
-          <span className={styles.columnStatLabel}>results</span>
-          <span className={styles.columnStatDivider} />
-          <span className={styles.columnStatBig}>{data.time}ms</span>
-          <span className={styles.columnStatLabel}>time</span>
-          <span className={styles.columnStatDivider} />
-          <span className={styles.columnStatBig}>{Math.round(data.avgScore * 100)}%</span>
-          <span className={styles.columnStatLabel}>avg</span>
+    <div className="flex flex-col min-w-0">
+      <div
+        className="relative overflow-hidden py-3.5 px-4 rounded-xl mb-2.5 backdrop-blur-lg"
+        style={{ background: 'rgba(20, 20, 35, 0.6)', border: '1px solid rgba(255, 255, 255, 0.06)' }}
+      >
+        <div className="absolute top-0 left-0 right-0 h-0.5 animate-[glowPulse_3s_ease-in-out_infinite]" style={{ background: `linear-gradient(90deg, ${color}, transparent)` }} />
+        <span className="text-base font-bold block mb-2" style={{ color }}>{title}</span>
+        <div className="flex items-baseline gap-1.5 flex-wrap">
+          <span className="text-base font-bold text-text-primary tabular-nums">{data.results.length}</span>
+          <span className="text-[11px] text-text-muted">results</span>
+          <span className="w-px h-3 mx-0.5 self-center" style={{ background: 'rgba(255, 255, 255, 0.08)' }} />
+          <span className="text-base font-bold text-text-primary tabular-nums">{data.time}ms</span>
+          <span className="text-[11px] text-text-muted">time</span>
+          <span className="w-px h-3 mx-0.5 self-center" style={{ background: 'rgba(255, 255, 255, 0.08)' }} />
+          <span className="text-base font-bold text-text-primary tabular-nums">{Math.round(data.avgScore * 100)}%</span>
+          <span className="text-[11px] text-text-muted">avg</span>
         </div>
       </div>
-      <div className={styles.columnResults}>
+      <div className="flex flex-col gap-1.5 max-h-[600px] overflow-y-auto">
         {data.results.map((doc, index) => {
           const scorePercent = Math.round((doc.score || 0) * 100);
           const isShared = sharedIds.has(doc.id);
@@ -351,16 +374,28 @@ function Column({
               key={doc.id}
               to={`/doc/${encodeURIComponent(doc.id)}`}
               state={{ doc }}
-              className={`${styles.resultCard} ${isShared ? styles.shared : ''} ${isUnique ? styles.unique : ''} ${isCrossHighlighted ? styles.crossHighlight : ''} ${visible ? styles.cardVisible : ''}`}
-              style={{ transitionDelay: visible ? `${index * 30}ms` : '0ms' }}
+              className={`block rounded-[10px] p-3 cursor-pointer backdrop-blur-md no-underline transition-all duration-300 ease-out ${
+                visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'
+              } hover:-translate-y-0.5 hover:shadow-[0_4px_20px_rgba(0,0,0,0.3)]`}
+              style={{
+                background: 'rgba(20, 20, 35, 0.5)',
+                border: `1px solid ${
+                  isCrossHighlighted ? 'rgba(74, 222, 128, 0.5)' :
+                  isShared ? 'rgba(74, 222, 128, 0.2)' :
+                  isUnique ? 'rgba(251, 191, 36, 0.15)' :
+                  'rgba(255, 255, 255, 0.05)'
+                }`,
+                transitionDelay: visible ? `${index * 30}ms` : '0ms',
+                boxShadow: isCrossHighlighted ? '0 0 16px rgba(74, 222, 128, 0.12)' : undefined,
+              }}
               onMouseEnter={() => isShared ? onHover(doc.id) : undefined}
               onMouseLeave={() => onHover(null)}
             >
-              <div className={styles.resultHeader}>
-                <div className={styles.resultScore}>
-                  <div className={styles.resultScoreBar}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex-1 flex items-center gap-1.5">
+                  <div className="flex-1 h-[3px] rounded-sm overflow-hidden" style={{ background: 'rgba(255, 255, 255, 0.04)' }}>
                     <div
-                      className={styles.resultScoreFill}
+                      className="h-full rounded-sm transition-[width] duration-500 ease-out"
                       style={{
                         width: visible ? `${scorePercent}%` : '0%',
                         background: color,
@@ -368,20 +403,24 @@ function Column({
                       }}
                     />
                   </div>
-                  <span className={styles.resultScoreLabel}>{scorePercent}%</span>
+                  <span className="text-[11px] text-text-muted font-semibold min-w-[30px] text-right tabular-nums">{scorePercent}%</span>
                 </div>
-                {isShared && <span className={styles.sharedBadge}>shared</span>}
-                {isUnique && <span className={styles.uniqueBadge}>unique</span>}
+                {isShared && (
+                  <span className="text-[9px] font-semibold uppercase tracking-wide py-0.5 px-[7px] rounded-md animate-[badgePulse_2.5s_ease-in-out_infinite]" style={{ color: '#4ade80', background: 'rgba(74, 222, 128, 0.1)' }}>shared</span>
+                )}
+                {isUnique && (
+                  <span className="text-[9px] font-semibold uppercase tracking-wide py-0.5 px-[7px] rounded-md" style={{ color: '#fbbf24', background: 'rgba(251, 191, 36, 0.1)' }}>unique</span>
+                )}
               </div>
-              <div className={styles.resultType}>{doc.type}</div>
-              <div className={styles.resultTitle}>
+              <div className="text-[11px] text-accent font-medium mb-1 capitalize">{doc.type}</div>
+              <div className="text-[13px] text-text-primary leading-snug overflow-hidden text-ellipsis whitespace-nowrap">
                 {(doc.content || '').replace(/^---[\s\S]*?---\s*/, '').replace(/^#+\s*/gm, '').split('\n')[0]?.slice(0, 60) || doc.id}
               </div>
             </Link>
           );
         })}
         {data.results.length === 0 && (
-          <div className={styles.emptyCol}>No results</div>
+          <div className="text-center text-text-muted py-8 px-4 text-[13px]">No results</div>
         )}
       </div>
     </div>

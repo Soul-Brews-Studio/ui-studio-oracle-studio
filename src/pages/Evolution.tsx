@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { SidebarLayout, TOOLS_NAV } from '../components/SidebarLayout';
-import styles from './Evolution.module.css';
 
 const EVOLUTION_FILTERS = [
   { key: 'all', label: 'All' },
@@ -79,11 +78,11 @@ export function Evolution() {
 
   function getTypeEmoji(type: string | null): string {
     switch (type) {
-      case 'learning': return '📚';
-      case 'principle': return '💎';
-      case 'retro': return '📝';
-      case 'pattern': return '🔮';
-      default: return '📄';
+      case 'learning': return '\u{1F4DA}';
+      case 'principle': return '\u{1F48E}';
+      case 'retro': return '\u{1F4DD}';
+      case 'pattern': return '\u{1F52E}';
+      default: return '\u{1F4C4}';
     }
   }
 
@@ -96,54 +95,54 @@ export function Evolution() {
       activeType={typeFilter}
       onTypeChange={setTypeFilter}
     >
-      <h1 className={styles.title}>Knowledge Evolution</h1>
-      <p className={styles.subtitle}>
+      <h1 className="text-[1.75rem] font-semibold text-text-primary mb-2">Knowledge Evolution</h1>
+      <p className="text-text-secondary text-[0.95rem] mb-6">
         Track how knowledge evolves — what was superseded and why
-        <span className={styles.philosophy}>"Nothing is Deleted"</span>
+        <span className="block italic text-[#c084fc] mt-1 text-sm">"Nothing is Deleted"</span>
       </p>
 
       {loading ? (
-        <div className={styles.loading}>Loading supersessions...</div>
+        <div className="text-center py-12 text-text-muted">Loading supersessions...</div>
       ) : filtered.length === 0 ? (
-        <div className={styles.empty}>
+        <div className="text-center py-12 text-text-secondary bg-bg-secondary rounded-xl mt-4">
           <p>No supersessions recorded yet.</p>
-          <p className={styles.hint}>
-            Use <code>oracle_supersede()</code> to track document evolution.
+          <p className="text-sm text-text-muted mt-2">
+            Use <code className="bg-bg-card px-2 py-0.5 rounded text-sm">oracle_supersede()</code> to track document evolution.
           </p>
         </div>
       ) : (
         <>
-          <div className={styles.stats}>
+          <div className="text-text-muted text-sm mb-4 pb-4 border-b border-border">
             <span>{total} supersession{total !== 1 ? 's' : ''} recorded</span>
           </div>
 
-          <div className={styles.timeline}>
+          <div className="flex flex-col gap-6">
             {Object.entries(grouped).map(([date, items]) => (
-              <div key={date} className={styles.dateGroup}>
-                <h2 className={styles.date}>{date}</h2>
-                <div className={styles.items}>
+              <div key={date} className="bg-bg-secondary rounded-xl p-4 px-5">
+                <h2 className="text-sm font-semibold text-text-muted mb-4 pb-2 border-b border-border">{date}</h2>
+                <div className="flex flex-col gap-4">
                   {items.map(s => (
-                    <div key={s.id} className={styles.item}>
-                      <div className={styles.arrow}>
-                        <span className={styles.old}>
+                    <div key={s.id} className="p-3 bg-bg-card rounded-lg border-l-[3px] border-l-[#c084fc]">
+                      <div className="flex items-center gap-2 text-[0.95rem] flex-wrap">
+                        <span className="text-text-secondary line-through opacity-70">
                           {getTypeEmoji(s.old_type)} {getFileName(s.old_path)}
                         </span>
-                        <span className={styles.connector}>→</span>
-                        <span className={styles.new}>
+                        <span className="text-[#c084fc] font-bold">{'\u2192'}</span>
+                        <span className="text-text-primary font-medium">
                           {s.new_path ? getFileName(s.new_path) : '(archived)'}
                         </span>
                       </div>
                       {s.reason && (
-                        <div className={styles.reason}>
+                        <div className="mt-2 p-2 bg-bg-secondary rounded text-sm text-text-secondary italic">
                           "{s.reason}"
                         </div>
                       )}
-                      <div className={styles.meta}>
-                        <span className={styles.by}>
-                          by {s.superseded_by || 'unknown'}
+                      <div className="flex gap-4 mt-2 text-xs text-text-muted">
+                        <span>
+                          {'\u{1F464}'} {s.superseded_by || 'unknown'}
                         </span>
-                        <span className={styles.time}>
-                          {new Date(s.superseded_at).toLocaleTimeString('en-US', {
+                        <span>
+                          {'\u{1F550}'} {new Date(s.superseded_at).toLocaleTimeString('en-US', {
                             hour: '2-digit',
                             minute: '2-digit'
                           })}

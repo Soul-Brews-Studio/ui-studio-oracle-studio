@@ -89,8 +89,7 @@ export function Header() {
       </div>
 
       {/* Nav row: full width, scrollable */}
-      <nav className="flex items-center gap-0.5 px-4 pb-2 overflow-x-auto scrollbar-none"
-        style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
+      <nav className="flex items-center gap-0.5 px-4 pb-2 flex-wrap">
         {navItems.map(item => (
           <Link
             key={item.path}

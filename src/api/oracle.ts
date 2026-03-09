@@ -37,11 +37,8 @@ export interface SearchResult {
 
 export interface Stats {
   total: number;
-  by_type?: {
-    learning: number;
-    principle: number;
-    retro: number;
-  };
+  by_type?: Record<string, number>;
+  by_type_files?: Record<string, number>;
   last_indexed?: string;
   is_stale?: boolean;
   vault_repo?: string;
@@ -50,6 +47,13 @@ export interface Stats {
     count: number;
     collection: string;
   };
+  vectors?: Array<{
+    key: string;
+    model: string;
+    collection: string;
+    count: number;
+    enabled: boolean;
+  }>;
 }
 
 // Search the knowledge base
@@ -151,8 +155,37 @@ export interface MapDocument {
   created_at: string | null;
 }
 
+// Get active Oracles
+export interface OracleIdentity {
+  oracle_name: string;
+  source: string;
+  last_seen: number;
+  actions: number;
+}
+export interface OracleProject {
+  project: string;
+  docs: number;
+  types: number;
+  last_indexed: number;
+}
+export async function getOracles(): Promise<{
+  identities: OracleIdentity[];
+  projects: OracleProject[];
+  total_projects: number;
+  total_identities: number;
+}> {
+  const res = await fetch(`${API_BASE}/oracles`);
+  return res.json();
+}
+
 export async function getMap(): Promise<{ documents: MapDocument[]; total: number }> {
   const res = await fetch(`${API_BASE}/map`);
+  return res.json();
+}
+
+export async function getMap3d(model?: string): Promise<{ documents: MapDocument[]; total: number; pca_info?: any }> {
+  const params = model ? `?model=${encodeURIComponent(model)}` : '';
+  const res = await fetch(`${API_BASE}/map3d${params}`);
   return res.json();
 }
 

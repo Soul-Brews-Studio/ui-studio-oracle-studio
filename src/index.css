@@ -79,3 +79,106 @@ a {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
+
+/* Prose styles for rendered Markdown (Handoff, etc.) */
+.prose-handoff h1,
+.prose-handoff h2,
+.prose-handoff h3 {
+  margin: 16px 0 8px;
+  color: var(--text-primary);
+}
+.prose-handoff h1 { font-size: 20px; }
+.prose-handoff h2 { font-size: 17px; }
+.prose-handoff h3 { font-size: 15px; }
+.prose-handoff p { margin: 8px 0; }
+.prose-handoff ul,
+.prose-handoff ol { margin: 8px 0; padding-left: 24px; }
+.prose-handoff li { margin: 4px 0; }
+.prose-handoff code {
+  background: var(--bg-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.prose-handoff pre {
+  background: var(--bg-secondary);
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.prose-handoff pre code { background: none; padding: 0; }
+.prose-handoff hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+.prose-handoff strong { color: var(--accent); }
+
+/* Proximity labels for Map 3D view (imperatively managed) */
+.proximity-label {
+  position: absolute;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-shadow: 0 0 8px rgba(0, 0, 0, 1), 0 1px 3px rgba(0, 0, 0, 0.9);
+  transition: opacity 0.15s ease-out;
+  pointer-events: none;
+  letter-spacing: 0.3px;
+}
+
+/* Pulsing dot animation for Map search indicator */
+@keyframes search-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+.animate-search-pulse {
+  animation: search-pulse 1s infinite;
+}
+
+/* HUD slider styles (Graph/Graph3D) */
+.hud-slider {
+  width: 100%;
+  margin-top: 4px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #333;
+  border-radius: 2px;
+  outline: none;
+}
+.hud-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #a78bfa;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.hud-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: #a78bfa;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+/* Playground page animations */
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+@keyframes badgePulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}

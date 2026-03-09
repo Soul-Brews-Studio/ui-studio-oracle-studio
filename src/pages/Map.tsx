@@ -4,9 +4,8 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { getMap, getStats, search } from '../api/oracle';
-import type { MapDocument, Stats } from '../api/oracle';
-import styles from './Map.module.css';
+import { getMap, getMap3d, getStats, getOracles, search } from '../api/oracle';
+import type { MapDocument, Stats, OracleProject } from '../api/oracle';
 
 const TYPE_COLORS: Record<string, string> = {
   principle: '#60a5fa',
@@ -80,11 +79,17 @@ export function Map() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeModel, setActiveModel] = useState<string | null>(null);
+  const [oracleProjects, setOracleProjects] = useState<OracleProject[]>([]);
+  const [totalOracles, setTotalOracles] = useState(0);
+  const [modelLoading, setModelLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [matchIds, setMatchIds] = useState<Set<string>>(new Set());
   const [hoveredDoc, setHoveredDoc] = useState<MapDocument | null>(null);
   const [searching, setSearching] = useState(false);
+  const [visibleTypes, setVisibleTypes] = useState<Set<string>>(new Set(['principle', 'learning', 'retro']));
 
+  const visibleTypesRef = useRef<Set<string>>(new Set(['principle', 'learning', 'retro']));
   const matchIdsRef = useRef<Set<string>>(new Set());
   const hoveredDocRef = useRef<MapDocument | null>(null);
   const animRef = useRef<number>(0);
@@ -98,24 +103,28 @@ export function Map() {
   // Camera orbit state
   const camAngleX = useRef({ x: 0, v: 0 });
   const camAngleY = useRef({ x: 0.3, v: 0 });
-  const camDist = useRef({ x: 18, v: 0 });
+  const camDist = useRef({ x: 28, v: 0 });
   const targetAngleX = useRef(0);
   const targetAngleY = useRef(0.3);
-  const targetDist = useRef(18);
+  const targetDist = useRef(28);
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
 
   useEffect(() => { matchIdsRef.current = matchIds; }, [matchIds]);
   useEffect(() => { hoveredDocRef.current = hoveredDoc; }, [hoveredDoc]);
+  useEffect(() => { visibleTypesRef.current = visibleTypes; }, [visibleTypes]);
 
   // Load data
   useEffect(() => {
     Promise.all([
       getMap().catch(() => ({ documents: [], total: 0 })),
       getStats().catch(() => null),
-    ]).then(([mapData, statsData]) => {
+      getOracles().catch(() => ({ projects: [], total_projects: 0, identities: [], total_identities: 0 })),
+    ]).then(([mapData, statsData, oraclesData]) => {
       setDocuments(mapData.documents);
       setStats(statsData);
+      setOracleProjects(oraclesData.projects);
+      setTotalOracles(oraclesData.total_projects);
       setLoading(false);
     }).catch(e => {
       setError(e.message);
@@ -299,7 +308,7 @@ export function Map() {
     function onWheel(e: WheelEvent) {
       e.preventDefault();
       const delta = e.deltaY > 0 ? 1.08 : 0.92;
-      targetDist.current = Math.max(5, Math.min(30, targetDist.current * delta));
+      targetDist.current = Math.max(5, Math.min(50, targetDist.current * delta));
     }
 
     function onMouseLeave() {
@@ -332,12 +341,20 @@ export function Map() {
     if (labelsContainer) {
       for (let i = 0; i < LABEL_POOL_SIZE; i++) {
         const el = document.createElement('div');
-        el.className = styles.proximityLabel;
+        el.className = 'proximity-label';
         el.style.display = 'none';
         labelsContainer.appendChild(el);
         labelPool.push(el);
       }
     }
+
+    // FPS counter
+    let fpsFrames = 0;
+    let fpsLastTime = performance.now();
+    const fpsEl = document.createElement('div');
+    fpsEl.className = 'proximity-label';
+    fpsEl.style.cssText = 'position:absolute;top:8px;right:8px;font-size:11px;font-mono;color:#888;z-index:10;';
+    container.appendChild(fpsEl);
 
     // Animation loop
     let time = 0;
@@ -347,6 +364,15 @@ export function Map() {
 
     function animate() {
       time += 0.016;
+
+      // FPS
+      fpsFrames++;
+      const now = performance.now();
+      if (now - fpsLastTime >= 1000) {
+        fpsEl.textContent = `${fpsFrames} fps`;
+        fpsFrames = 0;
+        fpsLastTime = now;
+      }
 
       // Slow celestial rotation when not dragging
       if (!isDragging.current && !prefersReduced) {
@@ -372,6 +398,7 @@ export function Map() {
       const matches = matchIdsRef.current;
       const hasSearch = matches.size > 0;
       const hovered = hoveredDocRef.current;
+      const visTypes = visibleTypesRef.current;
       const mx = mouseNDC.current.x;
       const my = mouseNDC.current.y;
 
@@ -383,8 +410,13 @@ export function Map() {
         const basePos = mesh.userData.basePos as THREE.Vector3;
         const baseScale = mesh.userData.baseScale as number;
         const mat = mesh.material as THREE.MeshStandardMaterial;
+        const isHidden = !visTypes.has(doc.type);
         const isMatched = hasSearch && (matches.has(doc.id) || (doc.chunk_ids?.some(cid => matches.has(cid)) ?? false));
         const isFaded = hasSearch && !isMatched;
+
+        // Hide filtered-out types
+        mesh.visible = !isHidden;
+        if (isHidden) return;
 
         // Breathing — gentle per-axis drift (galaxy float, not atomic pulse)
         if (!prefersReduced) {
@@ -459,6 +491,7 @@ export function Map() {
 
     return () => {
       cancelAnimationFrame(animRef.current);
+      fpsEl.remove();
       labelPool.forEach(el => el.remove());
       container.removeEventListener('mousedown', onMouseDown);
       container.removeEventListener('mouseup', onMouseUp);
@@ -486,6 +519,21 @@ export function Map() {
     };
   }, [documents, navigate]);
 
+  // Switch embedding model — reload map from real embeddings
+  async function switchModel(key: string) {
+    if (modelLoading) return;
+    setModelLoading(true);
+    setActiveModel(key);
+    try {
+      const data = await getMap3d(key);
+      setDocuments(data.documents);
+    } catch (e: any) {
+      console.error('Failed to load model:', e);
+    } finally {
+      setModelLoading(false);
+    }
+  }
+
   // Search
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -510,51 +558,53 @@ export function Map() {
 
   if (loading) {
     return (
-      <div className={styles.loadingContainer}>
-        <div className={styles.loadingText}>Loading knowledge map...</div>
-        <div className={styles.loadingHint}>Computing 3D projection from embeddings</div>
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)] gap-3">
+        <div className="text-lg text-text-primary">Loading knowledge map...</div>
+        <div className="text-[13px] text-text-muted">Computing 3D projection from embeddings</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className={styles.loadingContainer}>
-        <div className={styles.errorText}>Failed to load map: {error}</div>
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)] gap-3">
+        <div className="text-base text-[#ef4444]">Failed to load map: {error}</div>
       </div>
     );
   }
 
   return (
-    <div className={styles.container}>
-      <div className={styles.mapArea}>
-        <form onSubmit={handleSearch} className={styles.searchOverlay}>
+    <div className="flex h-[calc(100vh-64px)] overflow-hidden">
+      <div className="flex-1 relative overflow-hidden">
+        <form onSubmit={handleSearch} className="absolute top-4 left-1/2 -translate-x-1/2 flex gap-2 z-10 items-center">
           <input
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search to highlight region..."
-            className={styles.searchInput}
+            className="w-[300px] px-4 py-2.5 rounded-[10px] text-sm text-text-primary border border-white/[0.08] outline-none backdrop-blur-xl transition-colors duration-200 focus:border-accent placeholder:text-text-muted [&::-webkit-search-cancel-button]:hidden [&::-webkit-clear-button]:hidden [&::-ms-clear]:hidden"
+            style={{ background: 'rgba(10, 10, 20, 0.7)', WebkitAppearance: 'none' }}
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => { setSearchQuery(''); setMatchIds(new Set()); }}
-              className={styles.clearBtn}
+              className="px-3.5 py-2 rounded-[10px] text-xs text-text-secondary cursor-pointer border border-white/[0.08] backdrop-blur-xl transition-all duration-200 hover:border-accent hover:text-accent"
+              style={{ background: 'rgba(10, 10, 20, 0.7)' }}
             >
               Clear
             </button>
           )}
-          {searching && <span className={styles.searchingDot} />}
+          {searching && <span className="w-2 h-2 rounded-full bg-accent animate-search-pulse" />}
         </form>
 
-        <div ref={containerRef} className={styles.threeCanvas} />
-        <div ref={labelsRef} className={styles.labelsOverlay} />
+        <div ref={containerRef} className="w-full h-full cursor-grab active:cursor-grabbing" style={{ background: '#05050a' }} />
+        <div ref={labelsRef} className="absolute inset-0 pointer-events-none z-[5] overflow-hidden" />
 
         {documents.length === 0 && (
-          <div className={styles.emptyOverlay}>
-            <div className={styles.emptyTitle}>No Embeddings Yet</div>
-            <div className={styles.emptyHint}>
+          <div className="absolute inset-0 flex flex-col items-center justify-center z-[5] gap-3" style={{ background: 'rgba(5, 5, 10, 0.9)' }}>
+            <div className="text-[22px] font-bold text-text-primary">No Embeddings Yet</div>
+            <div className="text-sm text-text-muted text-center leading-relaxed">
               The 3D map requires vector embeddings from ChromaDB.<br />
               Run a vector index to populate the map.
             </div>
@@ -562,90 +612,174 @@ export function Map() {
         )}
 
         {hoveredDoc && (
-          <div className={styles.tooltip}>
-            <div className={styles.tooltipType} style={{ color: TYPE_COLORS[hoveredDoc.type] }}>
+          <div
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-[10px] px-5 py-3 z-20 pointer-events-none backdrop-blur-xl border border-white/[0.08] text-center"
+            style={{ background: 'rgba(10, 10, 20, 0.75)' }}
+          >
+            <div className="text-[11px] font-semibold uppercase tracking-wide mb-1" style={{ color: TYPE_COLORS[hoveredDoc.type] }}>
               {hoveredDoc.type}
             </div>
-            <div className={styles.tooltipTitle}>{extractTitle(hoveredDoc.source_file)}</div>
+            <div className="text-sm text-text-primary font-medium">{extractTitle(hoveredDoc.source_file)}</div>
             {hoveredDoc.concepts.length > 0 && (
-              <div className={styles.tooltipConcepts}>
+              <div className="text-[11px] text-text-muted mt-1">
                 {hoveredDoc.concepts.slice(0, 4).join(', ')}
               </div>
             )}
           </div>
         )}
 
-        <div className={styles.legend}>
-          {Object.entries(TYPE_COLORS).filter(([k]) => k !== 'unknown').map(([type, color]) => (
-            <span key={type} className={styles.legendItem}>
-              <span className={styles.legendDot} style={{ background: color }} />
-              {type}
-            </span>
-          ))}
+        <div
+          className="absolute bottom-4 left-4 flex gap-1 rounded-[10px] px-2 py-1.5 text-[11px] text-text-secondary backdrop-blur-xl border border-white/[0.08]"
+          style={{ background: 'rgba(10, 10, 20, 0.7)' }}
+        >
+          {Object.entries(TYPE_COLORS).filter(([k]) => k !== 'unknown').map(([type, color]) => {
+            const active = visibleTypes.has(type);
+            return (
+              <button
+                key={type}
+                onClick={() => setVisibleTypes(prev => {
+                  const next = new Set(prev);
+                  if (next.has(type)) next.delete(type);
+                  else next.add(type);
+                  return next;
+                })}
+                className={`flex items-center gap-[5px] px-2 py-1 rounded-md cursor-pointer border-none transition-all duration-150 ${active ? 'opacity-100' : 'opacity-30'}`}
+                style={{ background: active ? `${color}15` : 'transparent' }}
+              >
+                <span className="w-[7px] h-[7px] rounded-full" style={{ background: color }} />
+                {type}
+              </button>
+            );
+          })}
         </div>
 
-        <div className={styles.zoomControls}>
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-1">
           <button
             onClick={() => { targetDist.current = Math.max(5, targetDist.current * 0.75); }}
-            className={styles.zoomBtn}
+            className="w-9 h-9 rounded-[10px] text-text-primary text-lg font-medium cursor-pointer flex items-center justify-center backdrop-blur-xl border border-white/[0.08] transition-all duration-200 hover:border-accent hover:text-accent"
+            style={{ background: 'rgba(10, 10, 20, 0.7)' }}
           >+</button>
           <button
-            onClick={() => { targetDist.current = Math.min(30, targetDist.current * 1.35); }}
-            className={styles.zoomBtn}
+            onClick={() => { targetDist.current = Math.min(50, targetDist.current * 1.35); }}
+            className="w-9 h-9 rounded-[10px] text-text-primary text-lg font-medium cursor-pointer flex items-center justify-center backdrop-blur-xl border border-white/[0.08] transition-all duration-200 hover:border-accent hover:text-accent"
+            style={{ background: 'rgba(10, 10, 20, 0.7)' }}
           >-</button>
           <button
             onClick={() => {
               targetAngleX.current = 0;
               targetAngleY.current = 0.3;
-              targetDist.current = 18;
+              targetDist.current = 28;
             }}
-            className={styles.zoomBtn}
+            className="w-9 h-9 rounded-[10px] text-text-primary text-lg font-medium cursor-pointer flex items-center justify-center backdrop-blur-xl border border-white/[0.08] transition-all duration-200 hover:border-accent hover:text-accent"
+            style={{ background: 'rgba(10, 10, 20, 0.7)' }}
             title="Reset view"
           >R</button>
         </div>
       </div>
 
-      <div className={styles.sidebar}>
-        <h2 className={styles.sidebarTitle}>Knowledge Map</h2>
-        <div className={styles.statsList}>
-          <div className={styles.statItem}>
-            <span className={styles.statValue}>{documents.length.toLocaleString()}</span>
-            <span className={styles.statLabel}>Documents Mapped</span>
+      <div className="w-[260px] bg-bg-card border-l border-border p-6 overflow-y-auto flex flex-col">
+        <h2 className="text-xl font-bold text-text-primary mb-6">Knowledge Map</h2>
+        <div className="flex flex-col gap-4 flex-1">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xl font-bold text-text-primary tabular-nums">{documents.length.toLocaleString()}</span>
+            <span className="text-xs text-text-muted capitalize">Documents Mapped</span>
           </div>
-          {Object.entries(typeCounts).map(([type, count]) => (
-            <div key={type} className={styles.statItem}>
-              <span className={styles.statValue} style={{ color: TYPE_COLORS[type] }}>{count.toLocaleString()}</span>
-              <span className={styles.statLabel}>{type}s</span>
-            </div>
-          ))}
-          {stats?.vector && (
+          {Object.entries(typeCounts).map(([type, count]) => {
+            const chunks = stats?.by_type?.[type];
+            return (
+              <div key={type} className="flex flex-col gap-0.5">
+                <span className="text-xl font-bold tabular-nums" style={{ color: TYPE_COLORS[type] }}>{count.toLocaleString()}</span>
+                <span className="text-xs text-text-muted capitalize">
+                  {type}s{!activeModel && chunks && chunks !== count ? ` (${chunks.toLocaleString()} chunks)` : ''}
+                </span>
+              </div>
+            );
+          })}
+          {stats?.vectors && stats.vectors.length > 0 ? (
             <>
-              <div className={styles.divider} />
-              <div className={styles.statItem}>
-                <span className={styles.statValue}>{stats.vector.count.toLocaleString()}</span>
-                <span className={styles.statLabel}>Embeddings</span>
+              <div className="h-px bg-border my-1" />
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono uppercase tracking-wide text-text-muted">Embedding Models</span>
+                <span className="text-[9px] font-mono text-text-muted">LanceDB</span>
               </div>
-              <div className={styles.statItem}>
-                <span className={styles.statValue}>{stats.vector.enabled ? 'Active' : 'Offline'}</span>
-                <span className={styles.statLabel}>Vector DB</span>
+              {stats.vectors.map(v => {
+                const isSelected = activeModel === v.key;
+                return (
+                  <button
+                    key={v.key}
+                    onClick={() => v.enabled && switchModel(v.key)}
+                    disabled={!v.enabled || modelLoading}
+                    className={`flex flex-col gap-0.5 p-2 rounded-lg border text-left transition-all duration-150 ${
+                      isSelected
+                        ? 'border-accent bg-accent/10'
+                        : v.enabled
+                          ? 'border-border bg-white/[0.02] hover:border-border-hover cursor-pointer'
+                          : 'border-border-subtle opacity-50 cursor-not-allowed'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-text-primary">{v.key}</span>
+                      <span className={`text-[9px] font-mono font-semibold uppercase px-1.5 py-0.5 rounded ${
+                        isSelected ? 'bg-accent/20 text-accent' : v.enabled ? 'bg-success/20 text-success' : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {isSelected ? (modelLoading ? 'Loading' : 'Viewing') : v.enabled ? `${v.count.toLocaleString()}` : 'Offline'}
+                      </span>
+                    </div>
+                    <span className="text-xs text-text-muted font-mono">{v.model}</span>
+                  </button>
+                );
+              })}
+            </>
+          ) : stats?.vector && (
+            <>
+              <div className="h-px bg-border my-1" />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xl font-bold text-text-primary tabular-nums">{stats.vector.count.toLocaleString()}</span>
+                <span className="text-xs text-text-muted capitalize">Embeddings</span>
               </div>
-              <div className={styles.statItem}>
-                <span className={styles.statValue}>{stats.vector.collection}</span>
-                <span className={styles.statLabel}>Collection</span>
+            </>
+          )}
+          {totalOracles > 0 && (
+            <>
+              <div className="h-px bg-border my-1" />
+              <span className="text-xs font-mono uppercase tracking-wide text-text-muted">Oracle Universe</span>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xl font-bold text-accent tabular-nums">{totalOracles}</span>
+                <span className="text-xs text-text-muted">Repos Indexed</span>
+              </div>
+              <div className="flex flex-col gap-1 max-h-[180px] overflow-y-auto">
+                {oracleProjects.slice(0, 20).map(p => {
+                  const name = p.project.split('/').pop() || p.project;
+                  const org = p.project.split('/').slice(-2, -1)[0] || '';
+                  const age = Date.now() - p.last_indexed;
+                  const ageLabel = age < 3600_000 ? '<1h' : age < 86400_000 ? `${Math.floor(age / 3600_000)}h` : `${Math.floor(age / 86400_000)}d`;
+                  return (
+                    <div key={p.project} className="flex items-center justify-between py-0.5 gap-2">
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs text-text-primary truncate" title={p.project}>{name}</span>
+                        <span className="text-[9px] text-text-muted truncate">{org}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[9px] text-text-muted tabular-nums">{p.docs}</span>
+                        <span className={`w-1.5 h-1.5 rounded-full ${age < 86400_000 ? 'bg-success' : age < 604800_000 ? 'bg-warning' : 'bg-text-muted'}`} title={ageLabel + ' ago'} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </>
           )}
           {matchIds.size > 0 && (
             <>
-              <div className={styles.divider} />
-              <div className={styles.statItem}>
-                <span className={styles.statValue} style={{ color: '#4ade80' }}>{matchIds.size}</span>
-                <span className={styles.statLabel}>Search Matches</span>
+              <div className="h-px bg-border my-1" />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xl font-bold tabular-nums" style={{ color: '#4ade80' }}>{matchIds.size}</span>
+                <span className="text-xs text-text-muted capitalize">Search Matches</span>
               </div>
             </>
           )}
         </div>
-        <div className={styles.sidebarHint}>
+        <div className="text-[11px] text-text-muted mt-6 leading-relaxed">
           Drag to orbit. Scroll to zoom. Click a node to view.
         </div>
       </div>

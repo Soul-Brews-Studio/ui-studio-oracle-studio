@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import { getGraph, getFile } from '../api/oracle';
 import { useHandTracking } from '../hooks/useHandTracking';
-import styles from './Graph.module.css';
+// Tailwind classes replacing Graph.module.css
 
 interface Node {
   id: string;
@@ -171,14 +171,14 @@ export function Graph() {
   }
 
   if (loading) {
-    return <div className={styles.loading}>Loading graph...</div>;
+    return <div className="text-center text-text-muted py-16">Loading graph...</div>;
   }
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>Knowledge Graph</h1>
-        <div className={styles.stats}>
+    <div className="max-w-none mx-auto px-6 py-4">
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-[28px] font-bold text-text-primary">Knowledge Graph</h1>
+        <div className="text-text-secondary text-sm">
           {allNodes.length} nodes · {allLinks.length} links
           <button
             onClick={toggleView}
@@ -389,10 +389,10 @@ function Canvas2D({ nodes: allNodes, links: allLinks }: { nodes: Node[]; links: 
 
   return (
     <>
-      <div className={styles.legend}>
-        <span className={styles.legendItem}><span className={styles.dot} style={{ background: TYPE_COLORS_HEX.principle }}></span>Principle</span>
-        <span className={styles.legendItem}><span className={styles.dot} style={{ background: TYPE_COLORS_HEX.learning }}></span>Learning</span>
-        <span className={styles.legendItem}><span className={styles.dot} style={{ background: TYPE_COLORS_HEX.retro }}></span>Retro</span>
+      <div className="flex gap-6 mb-6">
+        <span className="flex items-center gap-2 text-text-secondary text-[13px]"><span className="w-2.5 h-2.5 rounded-full" style={{ background: TYPE_COLORS_HEX.principle }}></span>Principle</span>
+        <span className="flex items-center gap-2 text-text-secondary text-[13px]"><span className="w-2.5 h-2.5 rounded-full" style={{ background: TYPE_COLORS_HEX.learning }}></span>Learning</span>
+        <span className="flex items-center gap-2 text-text-secondary text-[13px]"><span className="w-2.5 h-2.5 rounded-full" style={{ background: TYPE_COLORS_HEX.retro }}></span>Retro</span>
         {allNodes.length > DEFAULT_NODE_LIMIT && (
           <button onClick={toggleFullGraph} style={{
             marginLeft: 'auto', background: showFull ? 'rgba(239, 68, 68, 0.2)' : 'rgba(74, 222, 128, 0.2)',
@@ -403,13 +403,13 @@ function Canvas2D({ nodes: allNodes, links: allLinks }: { nodes: Node[]; links: 
           </button>
         )}
       </div>
-      <div className={styles.canvasWrapper}>
-        <canvas ref={canvasRef} width={800} height={600} onClick={handleCanvasClick} className={styles.canvas} />
+      <div className="bg-bg-card border border-border rounded-xl overflow-hidden">
+        <canvas ref={canvasRef} width={800} height={600} onClick={handleCanvasClick} className="block w-full cursor-crosshair" />
       </div>
       {selectedNode && (
-        <div className={styles.nodeInfo}>
-          <span className={styles.nodeType}>{selectedNode.type}</span>
-          <p className={styles.nodeLabel}>{selectedNode.label}</p>
+        <div className="mt-4 bg-bg-card border border-border rounded-xl p-4">
+          <span className="inline-block bg-accent text-white px-2.5 py-1 rounded-xl text-[11px] font-medium uppercase mb-2">{selectedNode.type}</span>
+          <p className="text-text-primary leading-relaxed">{selectedNode.label}</p>
         </div>
       )}
     </>
@@ -1087,48 +1087,48 @@ function Canvas3D({ nodes, links }: { nodes: Node[]; links: Link[] }) {
 
   return (
     <>
-      <div className={styles.legend}>
+      <div className="flex gap-6 mb-6">
         {[{ key: 'principle', label: 'Principle', color: '#60a5fa' }, { key: 'learning', label: 'Learning', color: '#fbbf24' }, { key: 'retro', label: 'Retro', color: '#4ade80' }].map(({ key, label, color }) => {
           const count = counts[key] || 0;
           return (
             <button key={key} onClick={() => setTypeFilter(prev => ({ ...prev, [key]: !prev[key] }))} style={{ opacity: count === 0 ? 0.3 : (typeFilter[key] ? 1 : 0.4), cursor: count > 0 ? 'pointer' : 'default', background: 'transparent', border: 'none', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '6px', color: '#e0e0e0', fontSize: '13px' }}>
-              <span className={styles.dot} style={{ background: color }}></span>
+              <span className="w-2.5 h-2.5 rounded-full" style={{ background: color }}></span>
               {label} ({count})
             </button>
           );
         })}
       </div>
 
-      <div className={styles.controls}>
-        <span className={styles.hint}>Drag to rotate • Scroll to zoom • Click to select</span>
+      <div className="mb-2.5 flex justify-between items-center">
+        <span className="text-text-muted text-xs">Drag to rotate • Scroll to zoom • Click to select</span>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={toggleHandMode} className={styles.hudToggle} style={{ background: handTracking ? '#4ade80' : undefined, color: handTracking ? '#000' : undefined }}>{handTracking ? '✋ ON' : '✋'}</button>
-          <button onClick={resetCamera} className={styles.hudToggle}>Reset</button>
-          <button onClick={toggleHud} className={styles.hudToggle}>{showHud ? 'Hide' : 'Show'}</button>
+          <button onClick={toggleHandMode} className="bg-[rgba(167,139,250,0.2)] border border-[#a78bfa] text-[#a78bfa] px-3 py-1.5 rounded-md text-xs cursor-pointer transition-all duration-200 hover:bg-[rgba(167,139,250,0.3)]" style={{ background: handTracking ? '#4ade80' : undefined, color: handTracking ? '#000' : undefined }}>{handTracking ? '✋ ON' : '✋'}</button>
+          <button onClick={resetCamera} className="bg-[rgba(167,139,250,0.2)] border border-[#a78bfa] text-[#a78bfa] px-3 py-1.5 rounded-md text-xs cursor-pointer transition-all duration-200 hover:bg-[rgba(167,139,250,0.3)]">Reset</button>
+          <button onClick={toggleHud} className="bg-[rgba(167,139,250,0.2)] border border-[#a78bfa] text-[#a78bfa] px-3 py-1.5 rounded-md text-xs cursor-pointer transition-all duration-200 hover:bg-[rgba(167,139,250,0.3)]">{showHud ? 'Hide' : 'Show'}</button>
         </div>
       </div>
 
-      <div ref={containerRef} className={styles.canvas3d}>
+      <div ref={containerRef} className="flex-1 min-h-[600px] h-[calc(100vh-200px)] rounded-xl overflow-hidden bg-bg-primary border border-[#222] relative">
         {showHud && (
-          <div className={styles.hud} onMouseEnter={() => { hudHoveredRef.current = true; }} onMouseLeave={() => { hudHoveredRef.current = false; }}>
-            <div className={styles.hudTitle}>Controls</div>
-            <label className={styles.hudLabel} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+          <div className="absolute top-[15px] right-[15px] rounded-[10px] p-[15px] min-w-[200px] z-[100] backdrop-blur-[10px] pointer-events-auto border border-[#333]" style={{ background: 'rgba(15, 15, 25, 0.95)' }} onMouseEnter={() => { hudHoveredRef.current = true; }} onMouseLeave={() => { hudHoveredRef.current = false; }}>
+            <div className="text-sm font-semibold text-[#a78bfa] mb-3 pb-2 border-b border-[#333]">Controls</div>
+            <label className="block text-[11px] text-[#888] mb-2.5" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
               <input type="checkbox" checked={sphereMode} onChange={(e) => setSphereMode(e.target.checked)} style={{ width: '16px', height: '16px' }} />
               <span style={{ color: '#a78bfa' }}>Sphere Mode</span>
             </label>
-            <label className={styles.hudLabel}>Distance: {camDistance}<input type="range" min="5" max="40" step="1" value={camDistance} onChange={(e) => setCamDistance(Number(e.target.value))} className={styles.hudSlider} /></label>
-            <label className={styles.hudLabel}>Node Size: {nodeSize.toFixed(2)}<input type="range" min="0.02" max="0.2" step="0.01" value={nodeSize} onChange={(e) => setNodeSize(Number(e.target.value))} className={styles.hudSlider} /></label>
-            <label className={styles.hudLabel}>Rotation: {rotationSpeed.toFixed(3)}<input type="range" min="0" max="0.1" step="0.005" value={rotationSpeed} onChange={(e) => setRotationSpeed(Number(e.target.value))} className={styles.hudSlider} /></label>
-            <label className={styles.hudLabel}>Breathing: {breathingIntensity.toFixed(2)}<input type="range" min="0" max="0.2" step="0.01" value={breathingIntensity} onChange={(e) => setBreathingIntensity(Number(e.target.value))} className={styles.hudSlider} /></label>
-            <div className={styles.hudDivider}>Links</div>
-            <label className={styles.hudLabel} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><input type="checkbox" checked={showAllLinks} onChange={(e) => setShowAllLinks(e.target.checked)} style={{ width: '16px', height: '16px' }} />Show All Links</label>
-            <label className={styles.hudLabel}>Opacity: {linkOpacity.toFixed(2)}<input type="range" min="0.05" max="0.5" step="0.05" value={linkOpacity} onChange={(e) => setLinkOpacity(Number(e.target.value))} className={styles.hudSlider} /></label>
-            <div className={styles.hudDivider}>Effects</div>
-            <label className={styles.hudLabel} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label className="block text-[11px] text-[#888] mb-2.5">Distance: {camDistance}<input type="range" min="5" max="40" step="1" value={camDistance} onChange={(e) => setCamDistance(Number(e.target.value))} className="hud-slider" /></label>
+            <label className="block text-[11px] text-[#888] mb-2.5">Node Size: {nodeSize.toFixed(2)}<input type="range" min="0.02" max="0.2" step="0.01" value={nodeSize} onChange={(e) => setNodeSize(Number(e.target.value))} className="hud-slider" /></label>
+            <label className="block text-[11px] text-[#888] mb-2.5">Rotation: {rotationSpeed.toFixed(3)}<input type="range" min="0" max="0.1" step="0.005" value={rotationSpeed} onChange={(e) => setRotationSpeed(Number(e.target.value))} className="hud-slider" /></label>
+            <label className="block text-[11px] text-[#888] mb-2.5">Breathing: {breathingIntensity.toFixed(2)}<input type="range" min="0" max="0.2" step="0.01" value={breathingIntensity} onChange={(e) => setBreathingIntensity(Number(e.target.value))} className="hud-slider" /></label>
+            <div className="text-[10px] text-text-muted uppercase tracking-widest mt-3 mb-2 pt-2 border-t border-[#333]">Links</div>
+            <label className="block text-[11px] text-[#888] mb-2.5" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><input type="checkbox" checked={showAllLinks} onChange={(e) => setShowAllLinks(e.target.checked)} style={{ width: '16px', height: '16px' }} />Show All Links</label>
+            <label className="block text-[11px] text-[#888] mb-2.5">Opacity: {linkOpacity.toFixed(2)}<input type="range" min="0.05" max="0.5" step="0.05" value={linkOpacity} onChange={(e) => setLinkOpacity(Number(e.target.value))} className="hud-slider" /></label>
+            <div className="text-[10px] text-text-muted uppercase tracking-widest mt-3 mb-2 pt-2 border-t border-[#333]">Effects</div>
+            <label className="block text-[11px] text-[#888] mb-2.5" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <input type="checkbox" checked={lightningEnabled} onChange={(e) => setLightningEnabled(e.target.checked)} style={{ width: '16px', height: '16px' }} />
               <span style={{ color: '#88ccff' }}>⚡ Lightning</span>
             </label>
-            <label className={styles.hudLabel} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label className="block text-[11px] text-[#888] mb-2.5" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <input type="checkbox" checked={thunderEnabled} onChange={(e) => setThunderEnabled(e.target.checked)} style={{ width: '16px', height: '16px' }} />
               <span style={{ color: thunderEnabled ? '#fbbf24' : '#888' }}>⛈️ Thunder Flash</span>
             </label>
