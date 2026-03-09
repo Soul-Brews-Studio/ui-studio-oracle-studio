@@ -231,6 +231,36 @@ export async function getDashboardGrowth(period: 'week' | 'month' | 'quarter' = 
 }
 
 // ============================================================================
+// Live Feed API (Oracle activity from ~/.oracle/feed.log)
+// ============================================================================
+
+export interface FeedEvent {
+  timestamp: string;
+  oracle: string;
+  host: string;
+  event: string;
+  project: string;
+  session_id: string;
+  message: string;
+}
+
+export interface FeedResponse {
+  events: FeedEvent[];
+  total: number;
+  active_oracles: string[];
+}
+
+export async function getFeed(opts?: { limit?: number; oracle?: string; event?: string; since?: string }): Promise<FeedResponse> {
+  const params = new URLSearchParams();
+  if (opts?.limit) params.set('limit', String(opts.limit));
+  if (opts?.oracle) params.set('oracle', opts.oracle);
+  if (opts?.event) params.set('event', opts.event);
+  if (opts?.since) params.set('since', opts.since);
+  const res = await fetch(`${API_BASE}/feed?${params}`);
+  return res.json();
+}
+
+// ============================================================================
 // Auth API
 // ============================================================================
 

@@ -8,6 +8,7 @@ const navItems = [
   { path: '/map', label: 'Memory' },
   { path: '/search', label: 'Search' },
   { path: '/forum', label: 'Forum' },
+  { path: '/pulse', label: 'Pulse' },
   { path: '/activity?tab=searches', label: 'Activity' },
 ] as const;
 
@@ -96,8 +97,8 @@ export function Header() {
             to={item.path}
             className={`px-2.5 py-1.5 rounded-lg text-[13px] whitespace-nowrap transition-all duration-150 ${
               isActive(item.path)
-                ? 'bg-bg-card text-accent'
-                : 'text-text-secondary hover:bg-bg-card hover:text-accent'
+                ? 'bg-accent/15 text-accent font-semibold border border-accent/20'
+                : 'text-text-secondary hover:bg-bg-card hover:text-accent border border-transparent'
             }`}
           >
             {item.label}
