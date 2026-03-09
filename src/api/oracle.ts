@@ -152,6 +152,7 @@ export interface MapDocument {
   project: string | null;
   x: number;
   y: number;
+  z?: number;
   created_at: string | null;
 }
 

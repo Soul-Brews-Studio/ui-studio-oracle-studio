@@ -107,6 +107,8 @@ export function Map() {
   const targetAngleX = useRef(0);
   const targetAngleY = useRef(0.3);
   const targetDist = useRef(28);
+  const camTarget = useRef(new THREE.Vector3(0, 0, 0));
+  const targetCenter = useRef(new THREE.Vector3(0, 0, 0));
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
 
@@ -231,8 +233,8 @@ export function Map() {
       });
 
       const mesh = new THREE.Mesh(nodeGeometry, material);
-      // Use xxhash for deterministic z based on node index
-      const z = (xxhash(7, i) - 0.5) * 2; // ±1 normalized
+      // Use real z from PCA when available, fall back to xxhash
+      const z = doc.z != null ? doc.z : (xxhash(7, i) - 0.5) * 2;
       const basePos = new THREE.Vector3(
         doc.x * 8,
         doc.y * 8,
@@ -385,10 +387,20 @@ export function Map() {
       camDist.current = cdsTween(camDist.current, targetDist.current, 4, dt);
 
       const dist = camDist.current.x;
+
+      // Scale bloom down when zoomed out (dist > 20), up when close
+      const bloomScale = Math.max(0.1, Math.min(1.0, 18 / dist));
+      bloomPass.strength = 0.8 * bloomScale;
       camera.position.x = Math.sin(camAngleX.current.x) * Math.cos(camAngleY.current.x) * dist;
       camera.position.y = Math.sin(camAngleY.current.x) * dist;
       camera.position.z = Math.cos(camAngleX.current.x) * Math.cos(camAngleY.current.x) * dist;
-      camera.lookAt(0, 0, 0);
+      // Smooth pan to target center
+      camTarget.current.lerp(targetCenter.current, 0.05);
+      const ct = camTarget.current;
+      camera.position.x += ct.x;
+      camera.position.y += ct.y;
+      camera.position.z += ct.z;
+      camera.lookAt(ct.x, ct.y, ct.z);
 
       // Globe slow rotation
       globeMesh.rotation.y = time * 0.02;
@@ -669,28 +681,70 @@ export function Map() {
               targetAngleX.current = 0;
               targetAngleY.current = 0.3;
               targetDist.current = 28;
+              targetCenter.current.set(0, 0, 0);
             }}
             className="w-9 h-9 rounded-[10px] text-text-primary text-lg font-medium cursor-pointer flex items-center justify-center backdrop-blur-xl border border-white/[0.08] transition-all duration-200 hover:border-accent hover:text-accent"
             style={{ background: 'rgba(10, 10, 20, 0.7)' }}
             title="Reset view"
           >R</button>
+          <button
+            onClick={() => {
+              // Compute centroid of visible meshes
+              const meshes = meshesRef.current;
+              let cx = 0, cy = 0, cz = 0, count = 0;
+              meshes.forEach(m => {
+                if (m.visible) {
+                  cx += m.position.x;
+                  cy += m.position.y;
+                  cz += m.position.z;
+                  count++;
+                }
+              });
+              if (count > 0) {
+                targetCenter.current.set(cx / count, cy / count, cz / count);
+                targetDist.current = 6;
+              }
+            }}
+            className="w-9 h-9 rounded-[10px] text-text-primary text-lg font-medium cursor-pointer flex items-center justify-center backdrop-blur-xl border border-white/[0.08] transition-all duration-200 hover:border-accent hover:text-accent"
+            style={{ background: 'rgba(10, 10, 20, 0.7)' }}
+            title="Center on visible dots"
+          >C</button>
         </div>
       </div>
 
-      <div className="w-[260px] bg-bg-card border-l border-border p-6 overflow-y-auto flex flex-col">
-        <h2 className="text-xl font-bold text-text-primary mb-6">Knowledge Map</h2>
-        <div className="flex flex-col gap-4 flex-1">
+      <div className="w-[260px] bg-bg-card border-l border-border p-6 flex flex-col overflow-hidden">
+        <h2 className="text-xl font-bold text-text-primary mb-1">Knowledge Map</h2>
+        {activeModel && (
+          <span className="text-[11px] font-mono text-accent mb-4 block">viewing: {activeModel}</span>
+        )}
+        {!activeModel && <div className="mb-4" />}
+        <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-y-auto">
+          {stats?.total && (
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xl font-bold text-text-primary tabular-nums">{stats.total.toLocaleString()}</span>
+              <span className="text-xs text-text-muted">Total Indexed</span>
+            </div>
+          )}
           <div className="flex flex-col gap-0.5">
             <span className="text-xl font-bold text-text-primary tabular-nums">{documents.length.toLocaleString()}</span>
-            <span className="text-xs text-text-muted capitalize">Documents Mapped</span>
+            <span className="text-xs text-text-muted">Documents Mapped</span>
           </div>
+          {activeModel && stats?.vectors && (() => {
+            const mv = stats.vectors!.find(v => v.key === activeModel);
+            return mv ? (
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xl font-bold text-accent tabular-nums">{mv.count.toLocaleString()}</span>
+                <span className="text-xs text-text-muted">Vectors ({mv.model})</span>
+              </div>
+            ) : null;
+          })()}
           {Object.entries(typeCounts).map(([type, count]) => {
             const chunks = stats?.by_type?.[type];
             return (
               <div key={type} className="flex flex-col gap-0.5">
                 <span className="text-xl font-bold tabular-nums" style={{ color: TYPE_COLORS[type] }}>{count.toLocaleString()}</span>
                 <span className="text-xs text-text-muted capitalize">
-                  {type}s{!activeModel && chunks && chunks !== count ? ` (${chunks.toLocaleString()} chunks)` : ''}
+                  {type}s{chunks && chunks !== count ? ` (${chunks.toLocaleString()} chunks)` : ''}
                 </span>
               </div>
             );
@@ -747,8 +801,8 @@ export function Map() {
                 <span className="text-xl font-bold text-accent tabular-nums">{totalOracles}</span>
                 <span className="text-xs text-text-muted">Repos Indexed</span>
               </div>
-              <div className="flex flex-col gap-1 max-h-[180px] overflow-y-auto">
-                {oracleProjects.slice(0, 20).map(p => {
+              <div className="flex flex-col gap-1 flex-1 overflow-y-auto">
+                {oracleProjects.map(p => {
                   const name = p.project.split('/').pop() || p.project;
                   const org = p.project.split('/').slice(-2, -1)[0] || '';
                   const age = Date.now() - p.last_indexed;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Header } from './components/Header';
-import { QuickLearn } from './components/QuickLearn';
+
 import { Overview } from './pages/Overview';
 import { Feed } from './pages/Feed';
 import { DocDetail } from './pages/DocDetail';
@@ -80,7 +80,7 @@ function AppContent() {
         <Route path="/schedule" element={<RequireAuth><Schedule /></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
       </Routes>
-      {!isLoginPage && <QuickLearn />}
+
     </>
   );
 }
