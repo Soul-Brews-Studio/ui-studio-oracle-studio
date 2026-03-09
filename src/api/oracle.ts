@@ -24,6 +24,8 @@ export interface Document {
   project?: string;                       // ghq-style path (github.com/owner/repo)
   source?: 'fts' | 'vector' | 'hybrid';  // search source type
   score?: number;                         // relevance score 0-1
+  distance?: number;                      // raw vector distance
+  model?: string;                         // embedding model used
   created_at?: string;
 }
 
@@ -35,11 +37,8 @@ export interface SearchResult {
 
 export interface Stats {
   total: number;
-  by_type?: {
-    learning: number;
-    principle: number;
-    retro: number;
-  };
+  by_type?: Record<string, number>;
+  by_type_files?: Record<string, number>;
   last_indexed?: string;
   is_stale?: boolean;
   vault_repo?: string;
@@ -48,6 +47,13 @@ export interface Stats {
     count: number;
     collection: string;
   };
+  vectors?: Array<{
+    key: string;
+    model: string;
+    collection: string;
+    count: number;
+    enabled: boolean;
+  }>;
 }
 
 // Search the knowledge base
@@ -55,9 +61,11 @@ export async function search(
   query: string,
   type: string = 'all',
   limit: number = 20,
-  mode: 'hybrid' | 'fts' | 'vector' = 'hybrid'
-): Promise<SearchResult & { mode?: string; warning?: string }> {
+  mode: 'hybrid' | 'fts' | 'vector' = 'hybrid',
+  model?: string
+): Promise<SearchResult & { mode?: string; model?: string; warning?: string }> {
   const params = new URLSearchParams({ q: query, type, limit: String(limit), mode });
+  if (model) params.set('model', model);
   const res = await fetch(`${API_BASE}/search?${params}`);
   return res.json();
 }
@@ -144,11 +152,41 @@ export interface MapDocument {
   project: string | null;
   x: number;
   y: number;
+  z?: number;
   created_at: string | null;
+}
+
+// Get active Oracles
+export interface OracleIdentity {
+  oracle_name: string;
+  source: string;
+  last_seen: number;
+  actions: number;
+}
+export interface OracleProject {
+  project: string;
+  docs: number;
+  types: number;
+  last_indexed: number;
+}
+export async function getOracles(): Promise<{
+  identities: OracleIdentity[];
+  projects: OracleProject[];
+  total_projects: number;
+  total_identities: number;
+}> {
+  const res = await fetch(`${API_BASE}/oracles`);
+  return res.json();
 }
 
 export async function getMap(): Promise<{ documents: MapDocument[]; total: number }> {
   const res = await fetch(`${API_BASE}/map`);
+  return res.json();
+}
+
+export async function getMap3d(model?: string): Promise<{ documents: MapDocument[]; total: number; pca_info?: any }> {
+  const params = model ? `?model=${encodeURIComponent(model)}` : '';
+  const res = await fetch(`${API_BASE}/map3d${params}`);
   return res.json();
 }
 
@@ -189,6 +227,36 @@ export async function getDashboardActivity(days: number = 7): Promise<DashboardA
 export async function getDashboardGrowth(period: 'week' | 'month' | 'quarter' = 'week'): Promise<DashboardGrowth> {
   const params = new URLSearchParams({ period });
   const res = await fetch(`${API_BASE}/dashboard/growth?${params}`);
+  return res.json();
+}
+
+// ============================================================================
+// Live Feed API (Oracle activity from ~/.oracle/feed.log)
+// ============================================================================
+
+export interface FeedEvent {
+  timestamp: string;
+  oracle: string;
+  host: string;
+  event: string;
+  project: string;
+  session_id: string;
+  message: string;
+}
+
+export interface FeedResponse {
+  events: FeedEvent[];
+  total: number;
+  active_oracles: string[];
+}
+
+export async function getFeed(opts?: { limit?: number; oracle?: string; event?: string; since?: string }): Promise<FeedResponse> {
+  const params = new URLSearchParams();
+  if (opts?.limit) params.set('limit', String(opts.limit));
+  if (opts?.oracle) params.set('oracle', opts.oracle);
+  if (opts?.event) params.set('event', opts.event);
+  if (opts?.since) params.set('since', opts.since);
+  const res = await fetch(`${API_BASE}/feed?${params}`);
   return res.json();
 }
 

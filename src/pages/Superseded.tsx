@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { SidebarLayout, TOOLS_NAV } from '../components/SidebarLayout';
 import { getDocDisplayInfo } from '../utils/docDisplay';
-import styles from './Superseded.module.css';
 
 const TYPE_FILTERS = [
   { key: 'all', label: 'All' },
@@ -92,60 +91,62 @@ export function Superseded() {
       activeType={typeFilter}
       onTypeChange={setTypeFilter}
     >
-      <div className={styles.header}>
+      <div className="flex justify-between items-start mb-8 max-md:flex-col max-md:gap-4">
         <div>
-          <h1 className={styles.title}>Superseded Documents</h1>
-          <p className={styles.subtitle}>
+          <h1 className="text-[28px] font-bold text-text-primary mb-2">Superseded Documents</h1>
+          <p className="text-text-muted text-sm italic">
             "Nothing is Deleted" — Old documents preserved but marked as outdated
           </p>
         </div>
-        <div className={styles.stats}>
+        <div className="text-text-secondary text-sm bg-bg-card px-4 py-2 rounded-lg">
           {total} supersessions
         </div>
       </div>
 
       {loading ? (
-        <div className={styles.loading}>Loading...</div>
+        <div className="text-center text-text-muted py-16">Loading...</div>
       ) : filtered.length === 0 ? (
-        <div className={styles.empty}>
+        <div className="text-center text-text-muted py-16">
           <p>No superseded documents yet.</p>
-          <p className={styles.hint}>
-            Use <code>oracle_supersede(oldId, newId)</code> to mark outdated documents.
+          <p className="mt-4 text-[13px]">
+            Use <code className="bg-bg-card px-2 py-0.5 rounded text-[13px]">oracle_supersede(oldId, newId)</code> to mark outdated documents.
           </p>
         </div>
       ) : (
         <>
-          <div className={styles.list}>
+          <div className="flex flex-col gap-4">
             {filtered.map((log) => (
-              <div key={log.id} className={styles.card}>
-                <div className={styles.cardHeader}>
-                  <span className={styles.badge}>{log.old_type || 'doc'}</span>
-                  <span className={styles.date}>{formatDate(log.superseded_at)}</span>
+              <div key={log.id} className="bg-bg-card border border-border rounded-xl p-5">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="bg-[rgba(239,68,68,0.2)] text-[#ef4444] px-2.5 py-1 rounded-xl text-[11px] font-medium uppercase">
+                    {log.old_type || 'doc'}
+                  </span>
+                  <span className="text-text-muted text-xs">{formatDate(log.superseded_at)}</span>
                 </div>
 
-                <div className={styles.transition}>
-                  <div className={styles.oldDoc}>
-                    <span className={styles.label}>Old</span>
-                    <span className={styles.docTitle}>{extractTitle(log.old_path, log.old_title)}</span>
-                    <span className={styles.docPath}>{log.old_path}</span>
+                <div className="flex items-center gap-4 mb-4 max-md:flex-col">
+                  <div className="flex-1 flex flex-col gap-1 p-3 rounded-lg bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.2)]">
+                    <span className="text-[10px] uppercase tracking-wide text-text-muted">Old</span>
+                    <span className="font-medium text-text-primary text-sm">{extractTitle(log.old_path, log.old_title)}</span>
+                    <span className="text-[11px] text-text-muted font-mono break-all">{log.old_path}</span>
                   </div>
 
-                  <div className={styles.arrow}>→</div>
+                  <div className="text-2xl text-text-muted shrink-0 max-md:rotate-90">{'\u2192'}</div>
 
-                  <div className={styles.newDoc}>
-                    <span className={styles.label}>New</span>
-                    <span className={styles.docTitle}>{extractTitle(log.new_path, log.new_title)}</span>
-                    <span className={styles.docPath}>{log.new_path || log.new_id || 'N/A'}</span>
+                  <div className="flex-1 flex flex-col gap-1 p-3 rounded-lg bg-[rgba(74,222,128,0.1)] border border-[rgba(74,222,128,0.2)]">
+                    <span className="text-[10px] uppercase tracking-wide text-text-muted">New</span>
+                    <span className="font-medium text-text-primary text-sm">{extractTitle(log.new_path, log.new_title)}</span>
+                    <span className="text-[11px] text-text-muted font-mono break-all">{log.new_path || log.new_id || 'N/A'}</span>
                   </div>
                 </div>
 
                 {log.reason && (
-                  <div className={styles.reason}>
+                  <div className="bg-[rgba(167,139,250,0.1)] border-l-[3px] border-l-accent px-3.5 py-2.5 rounded-r-lg text-[13px] text-text-secondary mb-3">
                     <strong>Reason:</strong> {log.reason}
                   </div>
                 )}
 
-                <div className={styles.meta}>
+                <div className="flex gap-4 text-xs text-text-muted">
                   <span>by {log.superseded_by || 'user'}</span>
                   {(() => {
                     const info = getDocDisplayInfo(log.old_path || '', log.project);
@@ -156,21 +157,23 @@ export function Superseded() {
                             href={info.projectVaultUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className={styles.projectLink}
+                            className="text-xs text-text-secondary bg-[rgba(167,139,250,0.1)] px-2 py-0.5 rounded font-mono no-underline transition-all duration-200 hover:text-accent hover:bg-[rgba(167,139,250,0.2)]"
                           >
-                            🔗 {info.projectDisplay}
+                            {'\u{1F517}'} {info.projectDisplay}
                           </a>
                         ) : (
-                          <span className={styles.universalBadge}>✦ universal</span>
+                          <span className="text-[11px] text-warning bg-[rgba(251,191,36,0.1)] px-2 py-0.5 rounded font-medium">
+                            {'\u2726'} universal
+                          </span>
                         )}
                         {log.old_path && info.vaultUrl && (
                           <a
                             href={info.vaultUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className={styles.vaultBadge}
+                            className="text-[11px] text-[#34d399] bg-[rgba(52,211,153,0.1)] px-2 py-[3px] rounded font-medium no-underline transition-all duration-200 hover:bg-[rgba(52,211,153,0.2)] hover:text-[#6ee7b7]"
                           >
-                            🏛️ vault
+                            {'\u{1F3DB}\uFE0F'} vault
                           </a>
                         )}
                       </>
@@ -182,23 +185,23 @@ export function Superseded() {
           </div>
 
           {totalPages > 1 && (
-            <div className={styles.pagination}>
+            <div className="flex justify-center items-center gap-4 mt-8">
               <button
                 onClick={() => setPage(p => Math.max(0, p - 1))}
                 disabled={page === 0}
-                className={styles.pageBtn}
+                className="bg-bg-card border border-border text-text-secondary px-4 py-2 rounded-lg cursor-pointer text-[13px] transition-all duration-200 hover:bg-accent hover:text-white hover:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                ← Prev
+                {'\u2190'} Prev
               </button>
-              <span className={styles.pageInfo}>
+              <span className="text-text-muted text-[13px]">
                 Page {page + 1} of {totalPages}
               </span>
               <button
                 onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                 disabled={page >= totalPages - 1}
-                className={styles.pageBtn}
+                className="bg-bg-card border border-border text-text-secondary px-4 py-2 rounded-lg cursor-pointer text-[13px] transition-all duration-200 hover:bg-accent hover:text-white hover:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Next →
+                Next {'\u2192'}
               </button>
             </div>
           )}

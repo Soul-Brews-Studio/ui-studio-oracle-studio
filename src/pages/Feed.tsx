@@ -4,7 +4,6 @@ import { list } from '../api/oracle';
 import type { Document } from '../api/oracle';
 import { LogCard } from '../components/LogCard';
 import { SidebarLayout } from '../components/SidebarLayout';
-import styles from './Feed.module.css';
 
 export function Feed() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -48,21 +47,25 @@ export function Feed() {
 
   return (
     <SidebarLayout activeType={type} onTypeChange={setType}>
-      <h1 className={styles.title}>Knowledge Feed</h1>
-      <p className={styles.subtitle}>
+      <h1 className="text-[32px] font-bold text-text-primary mb-2">Knowledge Feed</h1>
+      <p className="text-base text-text-secondary mb-8">
         Browse Oracle's indexed knowledge — principles, learnings, and retrospectives
       </p>
 
-      <div className={styles.feed}>
+      <div className="flex flex-col">
         {docs.map(doc => (
           <LogCard key={doc.id} doc={doc} />
         ))}
       </div>
 
-      {loading && <div className={styles.loading}>Loading...</div>}
+      {loading && <div className="text-center text-text-muted py-6">Loading...</div>}
 
       {!loading && hasMore && (
-        <button type="button" onClick={() => loadDocs(false)} className={styles.loadMore}>
+        <button
+          type="button"
+          onClick={() => loadDocs(false)}
+          className="block w-full bg-bg-card border border-border text-text-primary py-4 rounded-lg cursor-pointer text-sm transition-all duration-200 mt-4 hover:border-accent hover:text-accent"
+        >
           Load More
         </button>
       )}

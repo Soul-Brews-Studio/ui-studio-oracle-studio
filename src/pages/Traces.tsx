@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { SidebarLayout, TOOLS_NAV } from '../components/SidebarLayout';
 import { getDocDisplayInfo } from '../utils/docDisplay';
-import styles from './Traces.module.css';
+import { Spinner } from '../components/ui/Spinner';
 
 interface TraceSummary {
   traceId: string;
@@ -305,11 +305,19 @@ export function Traces() {
   }, {} as Record<string, TraceSummary[]>);
 
   function getStatusBadge(status: string, hasAwakening: boolean) {
-    if (hasAwakening) return <span className={styles.badgeAwakening}>awakened</span>;
+    if (hasAwakening) return (
+      <span className="text-[11px] px-2.5 py-1 rounded-xl uppercase font-semibold tracking-wide" style={{ background: 'rgba(251, 191, 36, 0.2)', color: '#fbbf24' }}>awakened</span>
+    );
     switch (status) {
-      case 'distilled': return <span className={styles.badgeDistilled}>distilled</span>;
-      case 'reviewed': return <span className={styles.badgeReviewed}>reviewed</span>;
-      default: return <span className={styles.badgeRaw}>raw</span>;
+      case 'distilled': return (
+        <span className="text-[11px] px-2.5 py-1 rounded-xl uppercase font-semibold tracking-wide" style={{ background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80' }}>distilled</span>
+      );
+      case 'reviewed': return (
+        <span className="text-[11px] px-2.5 py-1 rounded-xl uppercase font-semibold tracking-wide" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa' }}>reviewed</span>
+      );
+      default: return (
+        <span className="text-[11px] px-2.5 py-1 rounded-xl uppercase font-semibold tracking-wide" style={{ background: 'rgba(100, 100, 100, 0.2)', color: '#666' }}>raw</span>
+      );
     }
   }
 
@@ -319,6 +327,251 @@ export function Traces() {
     if (t.commitCount > 0) parts.push(`${t.commitCount} commits`);
     if (t.issueCount > 0) parts.push(`${t.issueCount} issues`);
     return parts.length > 0 ? parts.join(' · ') : 'no dig points';
+  }
+
+  // Render file preview section (shared between main trace and linked traces)
+  function renderFilePreview(path: string, project: string | null, f?: { confidence?: string; matchReason?: string }) {
+    return (
+      <li key={path} className="flex flex-col">
+        <div
+          className={`flex items-center gap-3 flex-wrap cursor-pointer py-2 px-3 -my-2 -mx-3 rounded-md transition-colors duration-200 hover:bg-[rgba(167,139,250,0.1)] ${expandedFile === path ? 'bg-[rgba(167,139,250,0.15)]' : ''}`}
+          onClick={() => toggleFilePreview(path, project)}
+        >
+          <span className="font-mono text-[13px] text-accent break-all transition-colors duration-200 hover:text-text-primary">{path}</span>
+          {f?.confidence && (
+            <span className="text-[11px] py-0.5 px-2 rounded" style={{ background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80' }}>{f.confidence}</span>
+          )}
+          {f?.matchReason && (
+            <span className="text-xs text-text-muted italic">{f.matchReason}</span>
+          )}
+        </div>
+        {expandedFile === path && (
+          <div className="mt-3 bg-[rgba(0,0,0,0.3)] rounded-lg overflow-hidden">
+            {loadingFile ? (
+              <div className="p-4 text-text-muted italic">Loading...</div>
+            ) : (
+              <>
+                {(fileGithubUrl || project) && (
+                  <div className="py-2 px-4 flex items-center gap-4 text-text-muted border-t border-white/10">
+                    {fileGithubUrl && (
+                      <a
+                        href={fileGithubUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[13px] py-2 px-4 rounded-md no-underline transition-all duration-200"
+                        style={{ background: 'rgba(167, 139, 250, 0.2)', color: '#64b5f6' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(167, 139, 250, 0.3)'; e.currentTarget.style.color = '#fff'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(167, 139, 250, 0.2)'; e.currentTarget.style.color = '#64b5f6'; }}
+                      >
+                        View on GitHub →
+                      </a>
+                    )}
+                    {(() => {
+                      const sourceFile = project
+                        ? `${project.includes('github.com') ? '' : 'github.com/'}${project}/${path}`
+                        : path;
+                      const fInfo = getDocDisplayInfo(sourceFile, project);
+                      return fInfo.vaultUrl ? (
+                        <a
+                          href={fInfo.vaultUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[11px] font-medium py-0.5 px-2 rounded no-underline transition-all duration-200"
+                          style={{ background: 'rgba(52, 211, 153, 0.1)', color: '#34d399' }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52, 211, 153, 0.2)'; e.currentTarget.style.color = '#6ee7b7'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52, 211, 153, 0.1)'; e.currentTarget.style.color = '#34d399'; }}
+                        >
+                          🏛️ vault
+                        </a>
+                      ) : null;
+                    })()}
+                  </div>
+                )}
+                {fileConcepts.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 py-2.5 px-4 border-b border-white/10 bg-[rgba(0,0,0,0.2)]">
+                    <span className="text-[11px] text-text-muted mr-1">Related:</span>
+                    {fileConcepts.map((c, j) => (
+                      <span key={j} className="text-[11px] py-0.5 px-2.5 rounded-xl font-medium" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa' }}>{c}</span>
+                    ))}
+                  </div>
+                )}
+                {fileContent ? (
+                  <pre className="p-4 m-0 font-mono text-xs leading-normal text-text-secondary whitespace-pre-wrap break-words max-h-[400px] overflow-y-auto">{fileContent}</pre>
+                ) : (
+                  <div className="py-3 px-4 text-text-muted italic text-[13px]">
+                    ⚠️ local file not found
+                    {fileProject && (
+                      <div className="mt-2 not-italic font-mono text-xs text-accent inline-block py-1 px-2.5 rounded" style={{ background: 'rgba(167, 139, 250, 0.1)' }}>
+                        📦 Source: {fileProject}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </li>
+    );
+  }
+
+  // Render a dig points section (shared between main trace and linked traces)
+  function renderDigPoints(trace: TraceDetail, isLinked = false) {
+    return (
+      <div className="flex flex-col gap-8">
+        {trace.foundFiles?.length > 0 && (
+          <section className="bg-bg-card border border-border rounded-xl p-6">
+            <h3 className="text-sm text-accent mb-5 uppercase tracking-wide">Files ({trace.foundFiles.length})</h3>
+            <ul className="list-none p-0 m-0 flex flex-col gap-3">
+              {trace.foundFiles.map((f, i) => (
+                isLinked ? (
+                  <li key={i} className="flex flex-col">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="font-mono text-[13px] text-accent break-all">{f.path}</span>
+                      {f.confidence && (
+                        <span className="text-[11px] py-0.5 px-2 rounded" style={{ background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80' }}>{f.confidence}</span>
+                      )}
+                      {f.matchReason && (
+                        <span className="text-xs text-text-muted italic">{f.matchReason}</span>
+                      )}
+                    </div>
+                  </li>
+                ) : renderFilePreview(f.path, trace.project, f)
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {trace.foundCommits?.length > 0 && (
+          <section className="bg-bg-card border border-border rounded-xl p-6">
+            <h3 className="text-sm text-accent mb-5 uppercase tracking-wide">Commits ({trace.foundCommits.length})</h3>
+            {trace.project && (
+              <div className="text-xs text-text-muted mb-3 font-mono">{trace.project}</div>
+            )}
+            <ul className="list-none p-0 m-0 flex flex-col gap-3">
+              {trace.foundCommits.map((c, i) => {
+                const repoMatch = c.message?.match(/^([a-zA-Z0-9_-]+):\s/);
+                const org = trace.project?.split('/')[0] || 'LarisLabs';
+                let targetProject = trace.project;
+                if (repoMatch) {
+                  targetProject = `${org}/${repoMatch[1]}`;
+                }
+                const ghProject = targetProject?.includes('github.com') ? targetProject : `github.com/${targetProject}`;
+                const commitUrl = targetProject ? `https://${ghProject}/commit/${c.hash}` : null;
+                const displayHash = c.shortHash || c.hash?.slice(0, 7);
+                return (
+                  <li key={i} className="flex items-start gap-3">
+                    {commitUrl ? (
+                      <a
+                        href={commitUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-xs py-1 px-2 rounded text-accent no-underline shrink-0 transition-all duration-200 hover:text-white"
+                        style={{ background: 'rgba(167, 139, 250, 0.15)' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(167, 139, 250, 0.3)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(167, 139, 250, 0.15)'; }}
+                      >
+                        {displayHash}
+                      </a>
+                    ) : (
+                      <code className="font-mono text-xs py-1 px-2 rounded text-accent shrink-0" style={{ background: 'rgba(167, 139, 250, 0.15)' }}>
+                        {displayHash}
+                      </code>
+                    )}
+                    <span className="text-sm text-text-primary flex-1">{c.message}</span>
+                    {c.date && <span className="text-xs text-text-muted shrink-0">{c.date}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+
+        {trace.foundIssues?.length > 0 && (
+          <section className="bg-bg-card border border-border rounded-xl p-6">
+            <h3 className="text-sm text-accent mb-5 uppercase tracking-wide">Issues ({trace.foundIssues.length})</h3>
+            {trace.project && (
+              <div className="text-xs text-text-muted mb-3 font-mono">{trace.project}</div>
+            )}
+            <ul className="list-none p-0 m-0 flex flex-col gap-3">
+              {trace.foundIssues.map((issue, i) => {
+                const issueUrl = issue.url || (trace.project ? `https://${trace.project}/issues/${issue.number}` : null);
+                return (
+                  <li key={i} className="flex items-center gap-3">
+                    <span
+                      className="font-mono text-xs py-1 px-2 rounded shrink-0"
+                      style={issue.state === 'open'
+                        ? { background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80' }
+                        : { background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa' }
+                      }
+                    >
+                      #{issue.number}
+                    </span>
+                    {issueUrl ? (
+                      <a href={issueUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-text-primary no-underline hover:text-accent hover:underline">
+                        {issue.title}
+                      </a>
+                    ) : (
+                      <span className="text-sm text-text-primary">{issue.title}</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+
+        {!isLinked && trace.foundRetrospectives?.length > 0 && (
+          <section className="bg-bg-card border border-border rounded-xl p-6">
+            <h3 className="text-sm text-accent mb-5 uppercase tracking-wide">Retrospectives ({trace.foundRetrospectives.length})</h3>
+            <ul className="list-none p-0 m-0 flex flex-col gap-3">
+              {trace.foundRetrospectives.map((path, i) => (
+                <li key={i} className="flex flex-col">
+                  <div
+                    className={`flex items-center gap-3 flex-wrap cursor-pointer py-2 px-3 -my-2 -mx-3 rounded-md transition-colors duration-200 hover:bg-[rgba(167,139,250,0.1)] ${expandedFile === path ? 'bg-[rgba(167,139,250,0.15)]' : ''}`}
+                    onClick={() => toggleFilePreview(path, null)}
+                  >
+                    <span className="font-mono text-[13px] text-accent break-all">{path}</span>
+                  </div>
+                  {expandedFile === path && (
+                    <div className="mt-3 bg-[rgba(0,0,0,0.3)] rounded-lg overflow-hidden">
+                      {loadingFile ? (
+                        <div className="p-4 text-text-muted italic">Loading...</div>
+                      ) : (
+                        <>
+                          {fileContent ? (
+                            <pre className="p-4 m-0 font-mono text-xs leading-normal text-text-secondary whitespace-pre-wrap break-words max-h-[400px] overflow-y-auto">{fileContent}</pre>
+                          ) : (
+                            <div className="py-3 px-4 text-text-muted italic text-[13px]">Retrospective not found</div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {!isLinked && trace.foundLearnings?.length > 0 && (
+          <section className="bg-bg-card border border-border rounded-xl p-6">
+            <h3 className="text-sm text-accent mb-5 uppercase tracking-wide">Learnings ({trace.foundLearnings.length})</h3>
+            <ul className="list-none p-0 m-0 flex flex-col gap-3">
+              {trace.foundLearnings.map((item, i) => {
+                const isFilePath = item.startsWith('ψ/') || item.includes('/memory/');
+                if (!isFilePath) {
+                  return (
+                    <li key={i} className="py-2.5 px-3.5 rounded text-[13px] text-text-primary mb-2 border-l-[3px] border-l-accent" style={{ background: 'rgba(167, 139, 250, 0.1)' }}>{item}</li>
+                  );
+                }
+                return renderFilePreview(item, trace.project);
+              })}
+            </ul>
+          </section>
+        )}
+      </div>
+    );
   }
 
   // Detail view
@@ -336,11 +589,14 @@ export function Traces() {
         activeType={statusFilter}
         onTypeChange={setStatusFilter}
       >
-        <div className={styles.navBar}>
-          <button onClick={() => navigate('/traces')} className={styles.backLink}>
+        <div className="flex justify-between items-center mb-8">
+          <button
+            onClick={() => navigate('/traces')}
+            className="inline-block bg-none border-none text-text-secondary text-sm cursor-pointer p-0 transition-colors duration-200 hover:text-accent"
+          >
             ← Back to Traces
           </button>
-          <div className={styles.chainNav}>
+          <div className="flex items-center gap-2">
             {/* Use linked chain if available, otherwise use family chain */}
             {(() => {
               const chain = linkedChain.length > 1 ? linkedChain : familyChain;
@@ -353,31 +609,37 @@ export function Traces() {
                   {position > 0 ? (
                     <button
                       onClick={() => navigate(`/traces/${chain[0].traceId}`)}
-                      className={styles.navButton}
+                      className="py-1.5 px-3 rounded-md text-[13px] text-accent border border-accent cursor-pointer transition-all duration-200 hover:bg-accent hover:text-white"
+                      style={{ background: 'rgba(167, 139, 250, 0.15)' }}
                       title="First"
                     >
                       ⏮
                     </button>
                   ) : (
-                    <span className={styles.navDisabled}>⏮</span>
+                    <span className="text-text-muted py-1.5 px-3 text-[13px] opacity-50">⏮</span>
                   )}
                   {position > 0 ? (
                     <button
                       onClick={() => navigate(`/traces/${chain[position - 1].traceId}`)}
-                      className={styles.navButton}
+                      className="py-1.5 px-3 rounded-md text-[13px] text-accent border border-accent cursor-pointer transition-all duration-200 hover:bg-accent hover:text-white"
+                      style={{ background: 'rgba(167, 139, 250, 0.15)' }}
                       title="Previous"
                     >
                       ←
                     </button>
                   ) : (
-                    <span className={styles.navDisabled}>←</span>
+                    <span className="text-text-muted py-1.5 px-3 text-[13px] opacity-50">←</span>
                   )}
-                  <div className={styles.chainNumbers}>
+                  <div className="flex gap-1">
                     {chain.map((trace, i) => (
                       <button
                         key={trace.traceId}
                         onClick={() => navigate(`/traces/${trace.traceId}`)}
-                        className={`${styles.chainNumber} ${i === position ? styles.currentNumber : ''}`}
+                        className={`w-7 h-7 rounded-md border text-[13px] font-medium cursor-pointer transition-all duration-200 ${
+                          i === position
+                            ? 'bg-accent border-accent text-white cursor-default'
+                            : 'bg-transparent border-border text-text-secondary hover:border-accent hover:text-accent'
+                        }`}
                         title={trace.query}
                       >
                         {i + 1}
@@ -387,24 +649,26 @@ export function Traces() {
                   {position < chain.length - 1 ? (
                     <button
                       onClick={() => navigate(`/traces/${chain[position + 1].traceId}`)}
-                      className={styles.navButton}
+                      className="py-1.5 px-3 rounded-md text-[13px] text-accent border border-accent cursor-pointer transition-all duration-200 hover:bg-accent hover:text-white"
+                      style={{ background: 'rgba(167, 139, 250, 0.15)' }}
                       title="Next"
                     >
                       →
                     </button>
                   ) : (
-                    <span className={styles.navDisabled}>→</span>
+                    <span className="text-text-muted py-1.5 px-3 text-[13px] opacity-50">→</span>
                   )}
                   {position < chain.length - 1 ? (
                     <button
                       onClick={() => navigate(`/traces/${chain[chain.length - 1].traceId}`)}
-                      className={styles.navButton}
+                      className="py-1.5 px-3 rounded-md text-[13px] text-accent border border-accent cursor-pointer transition-all duration-200 hover:bg-accent hover:text-white"
+                      style={{ background: 'rgba(167, 139, 250, 0.15)' }}
                       title="Last"
                     >
                       ⏭
                     </button>
                   ) : (
-                    <span className={styles.navDisabled}>⏭</span>
+                    <span className="text-text-muted py-1.5 px-3 text-[13px] opacity-50">⏭</span>
                   )}
                 </>
               );
@@ -412,11 +676,11 @@ export function Traces() {
           </div>
         </div>
 
-        <div className={styles.detailHeader}>
-          <h1 className={styles.query}>"{t.query}"</h1>
-          <div className={styles.detailMeta}>
+        <div className="mb-8 pb-6 border-b border-border">
+          <h1 className="text-[28px] font-semibold text-text-primary mb-4 leading-snug">"{t.query}"</h1>
+          <div className="flex items-center gap-4 flex-wrap">
             {getStatusBadge(t.status, !!t.awakening)}
-            <span className={styles.queryType}>{t.queryType}</span>
+            <span className="text-xs text-text-muted bg-bg-card py-1 px-2.5 rounded">{t.queryType}</span>
             {(() => {
               const tInfo = getDocDisplayInfo('', t.project);
               return tInfo.projectVaultUrl ? (
@@ -424,292 +688,57 @@ export function Traces() {
                   href={tInfo.projectVaultUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={styles.projectLink}
+                  className="text-xs text-text-secondary font-mono py-1 px-2.5 rounded no-underline transition-all duration-200 hover:text-accent"
+                  style={{ background: 'rgba(167, 139, 250, 0.1)' }}
                   onClick={e => e.stopPropagation()}
                 >
                   🔗 {tInfo.projectDisplay}
                 </a>
               ) : (
-                <span className={styles.universalBadge}>✦ universal</span>
+                <span className="text-[11px] font-medium py-0.5 px-2 rounded" style={{ background: 'rgba(251, 191, 36, 0.1)', color: '#fbbf24' }}>✦ universal</span>
               );
             })()}
-            <span className={styles.timestamp}>
+            <span className="text-xs text-text-muted">
               {new Date(t.createdAt).toLocaleString()}
             </span>
           </div>
         </div>
 
         {t.awakening && (
-          <div className={styles.awakening}>
-            <h3>Awakening</h3>
-            <p>{t.awakening}</p>
+          <div className="rounded-xl p-6 mb-8" style={{ background: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)' }}>
+            <h3 className="text-sm mb-3 uppercase tracking-wide" style={{ color: '#fbbf24' }}>Awakening</h3>
+            <p className="text-text-primary leading-relaxed">{t.awakening}</p>
           </div>
         )}
 
-        <div className={styles.digPointsSummary}>
+        <div className="flex items-center gap-4 text-sm text-text-secondary mb-8">
           <span>{totalDigPoints} dig points found</span>
-          {t.depth > 0 && <span className={styles.depth}>depth: {t.depth}</span>}
-        </div>
-
-        <div className={styles.digPoints}>
-          {t.foundFiles.length > 0 && (
-            <section className={styles.section}>
-              <h3>Files ({t.foundFiles.length})</h3>
-              <ul className={styles.fileList}>
-                {t.foundFiles.map((f, i) => (
-                  <li key={i} className={styles.fileEntry}>
-                    <div
-                      className={`${styles.fileItem} ${expandedFile === f.path ? styles.expanded : ''}`}
-                      onClick={() => toggleFilePreview(f.path, t.project)}
-                    >
-                      <span className={styles.filePath}>{f.path}</span>
-                      {f.confidence && <span className={styles.confidence}>{f.confidence}</span>}
-                      {f.matchReason && <span className={styles.matchReason}>{f.matchReason}</span>}
-                    </div>
-                    {expandedFile === f.path && (
-                      <div className={styles.filePreview}>
-                        {loadingFile ? (
-                          <div className={styles.previewLoading}>Loading...</div>
-                        ) : (
-                          <>
-                            {(fileGithubUrl || t.project) && (
-                              <div className={styles.githubLink}>
-                                {fileGithubUrl && (
-                                  <a
-                                    href={fileGithubUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className={styles.viewOnGithub}
-                                  >
-                                    View on GitHub →
-                                  </a>
-                                )}
-                                {(() => {
-                                  const sourceFile = t.project
-                                    ? `${t.project.includes('github.com') ? '' : 'github.com/'}${t.project}/${f.path}`
-                                    : f.path;
-                                  const fInfo = getDocDisplayInfo(sourceFile, t.project);
-                                  return fInfo.vaultUrl ? (
-                                    <a
-                                      href={fInfo.vaultUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className={styles.vaultBadge}
-                                    >
-                                      🏛️ vault
-                                    </a>
-                                  ) : null;
-                                })()}
-                              </div>
-                            )}
-                            {fileConcepts.length > 0 && (
-                              <div className={styles.conceptsBar}>
-                                <span className={styles.conceptLabel}>Related:</span>
-                                {fileConcepts.map((c, j) => (
-                                  <span key={j} className={styles.conceptBadge}>{c}</span>
-                                ))}
-                              </div>
-                            )}
-                            {fileContent ? (
-                              <pre className={styles.previewContent}>{fileContent}</pre>
-                            ) : (
-                              <div className={styles.notFoundLocal}>
-                                ⚠️ local file not found
-                                {fileProject && (
-                                  <div className={styles.projectSource}>
-                                    📦 Source: {fileProject}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {t.foundCommits.length > 0 && (
-            <section className={styles.section}>
-              <h3>Commits ({t.foundCommits.length})</h3>
-              {t.project && (
-                <div className={styles.commitRepo}>
-                  {t.project}
-                </div>
-              )}
-              <ul className={styles.commitList}>
-                {t.foundCommits.map((c, i) => {
-                  // Try to detect repo from commit message prefix (e.g., "floodboy-astro: ...")
-                  const repoMatch = c.message.match(/^([a-zA-Z0-9_-]+):\s/);
-                  const org = t.project?.split('/')[0] || 'LarisLabs';
-                  let targetProject = t.project;
-                  if (repoMatch) {
-                    // Use detected repo with same org
-                    targetProject = `${org}/${repoMatch[1]}`;
-                  }
-                  const ghProject = targetProject?.includes('github.com') ? targetProject : `github.com/${targetProject}`;
-                  const commitUrl = targetProject ? `https://${ghProject}/commit/${c.hash}` : null;
-                  const displayHash = c.shortHash || c.hash.slice(0, 7);
-                  return (
-                  <li key={i} className={styles.commitItem}>
-                    {commitUrl ? (
-                      <a href={commitUrl} target="_blank" rel="noopener noreferrer" className={styles.commitHash}>
-                        {displayHash}
-                      </a>
-                    ) : (
-                      <code className={styles.commitHash}>{displayHash}</code>
-                    )}
-                    <span className={styles.commitMessage}>{c.message}</span>
-                    {c.date && <span className={styles.commitDate}>{c.date}</span>}
-                  </li>
-                  );
-                })}
-              </ul>
-            </section>
-          )}
-
-          {t.foundIssues.length > 0 && (
-            <section className={styles.section}>
-              <h3>Issues ({t.foundIssues.length})</h3>
-              {t.project && (
-                <div className={styles.issueRepo}>
-                  {t.project}
-                </div>
-              )}
-              <ul className={styles.issueList}>
-                {t.foundIssues.map((issue, i) => {
-                  const issueUrl = issue.url || (t.project ? `https://${t.project}/issues/${issue.number}` : null);
-                  return (
-                  <li key={i} className={styles.issueItem}>
-                    <span className={`${styles.issueState} ${issue.state === 'open' ? styles.open : styles.closed}`}>
-                      #{issue.number}
-                    </span>
-                    {issueUrl ? (
-                      <a href={issueUrl} target="_blank" rel="noopener noreferrer" className={styles.issueTitle}>
-                        {issue.title}
-                      </a>
-                    ) : (
-                      <span className={styles.issueTitle}>{issue.title}</span>
-                    )}
-                  </li>
-                  );
-                })}
-              </ul>
-            </section>
-          )}
-
-          {t.foundRetrospectives.length > 0 && (
-            <section className={styles.section}>
-              <h3>Retrospectives ({t.foundRetrospectives.length})</h3>
-              <ul className={styles.fileList}>
-                {t.foundRetrospectives.map((path, i) => (
-                  <li key={i} className={styles.fileEntry}>
-                    <div
-                      className={`${styles.fileItem} ${expandedFile === path ? styles.expanded : ''}`}
-                      onClick={() => toggleFilePreview(path, null)}
-                    >
-                      <span className={styles.filePath}>{path}</span>
-                    </div>
-                    {expandedFile === path && (
-                      <div className={styles.filePreview}>
-                        {loadingFile ? (
-                          <div className={styles.previewLoading}>Loading...</div>
-                        ) : (
-                          <>
-                            {fileContent ? (
-                              <pre className={styles.previewContent}>{fileContent}</pre>
-                            ) : (
-                              <div className={styles.notFoundLocal}>Retrospective not found</div>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {t.foundLearnings.length > 0 && (
-            <section className={styles.section}>
-              <h3>Learnings ({t.foundLearnings.length})</h3>
-              <ul className={styles.fileList}>
-                {t.foundLearnings.map((item, i) => {
-                  const isFilePath = item.startsWith('ψ/') || item.includes('/memory/');
-                  if (!isFilePath) {
-                    return (
-                      <li key={i} className={styles.learningSnippet}>{item}</li>
-                    );
-                  }
-                  return (
-                    <li key={i} className={styles.fileEntry}>
-                      <div
-                        className={`${styles.fileItem} ${expandedFile === item ? styles.expanded : ''}`}
-                        onClick={() => toggleFilePreview(item, t.project)}
-                      >
-                        <span className={styles.filePath}>{item}</span>
-                      </div>
-                      {expandedFile === item && (
-                        <div className={styles.filePreview}>
-                          {loadingFile ? (
-                            <div className={styles.previewLoading}>Loading...</div>
-                          ) : (
-                            <>
-                              {fileConcepts.length > 0 && (
-                                <div className={styles.conceptsBar}>
-                                  <span className={styles.conceptLabel}>Related:</span>
-                                  {fileConcepts.map((c, j) => (
-                                    <span key={j} className={styles.conceptBadge}>{c}</span>
-                                  ))}
-                                </div>
-                              )}
-                              {fileContent ? (
-                                <pre className={styles.previewContent}>{fileContent}</pre>
-                              ) : (
-                                <div className={styles.notFoundLocal}>
-                                  ⚠️ local file not found
-                                  {fileProject && (
-                                    <div className={styles.projectSource}>
-                                      📦 Source: {fileProject}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          )}
-
-          {totalDigPoints === 0 && (
-            <div className={styles.noDigPoints}>
-              No dig points recorded for this trace.
-            </div>
+          {t.depth > 0 && (
+            <span className="py-0.5 px-2 rounded text-accent" style={{ background: 'rgba(167, 139, 250, 0.15)' }}>depth: {t.depth}</span>
           )}
         </div>
+
+        {renderDigPoints(t)}
+
+        {totalDigPoints === 0 && (
+          <div className="text-center p-12 text-text-muted bg-bg-card border border-border rounded-xl">
+            No dig points recorded for this trace.
+          </div>
+        )}
 
         {/* Linked Traces - Full Content */}
         {linkedChain.filter(trace => trace.traceId !== t.traceId).map((trace) => (
-          <div key={trace.traceId} className={styles.linkedTrace}>
-            <div className={styles.linkedTraceHeader}>
+          <div key={trace.traceId} className="mt-12 pt-8 border-t-2 border-t-accent">
+            <div className="mb-6">
               <button
-                className={styles.linkedTraceLabel}
+                className="bg-none border-none p-0 text-xs font-semibold text-accent uppercase tracking-wider cursor-pointer transition-opacity duration-200 hover:opacity-70 hover:underline mb-2 block"
                 onClick={() => navigate(`/traces/${trace.traceId}`)}
               >
                 {trace.traceId === t.prevTraceId ? '← Previous' : 'Next →'}
               </button>
-              <h2 className={styles.linkedTraceQuery}>"{trace.query}"</h2>
-              <div className={styles.linkedTraceMeta}>
-                <span className={styles.queryType}>{trace.queryType}</span>
+              <h2 className="text-[22px] font-semibold text-text-primary mb-3 leading-snug">"{trace.query}"</h2>
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-xs text-text-muted bg-bg-card py-1 px-2.5 rounded">{trace.queryType}</span>
                 {(() => {
                   const ltInfo = getDocDisplayInfo('', trace.project);
                   return ltInfo.projectVaultUrl ? (
@@ -717,98 +746,22 @@ export function Traces() {
                       href={ltInfo.projectVaultUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={styles.projectLink}
+                      className="text-xs text-text-secondary font-mono py-1 px-2.5 rounded no-underline transition-all duration-200 hover:text-accent"
+                      style={{ background: 'rgba(167, 139, 250, 0.1)' }}
                     >
                       🔗 {ltInfo.projectDisplay}
                     </a>
                   ) : (
-                    <span className={styles.universalBadge}>✦ universal</span>
+                    <span className="text-[11px] font-medium py-0.5 px-2 rounded" style={{ background: 'rgba(251, 191, 36, 0.1)', color: '#fbbf24' }}>✦ universal</span>
                   );
                 })()}
-                <span className={styles.timestamp}>
+                <span className="text-xs text-text-muted">
                   {new Date(trace.createdAt).toLocaleString()}
                 </span>
               </div>
             </div>
 
-            <div className={styles.digPoints}>
-              {trace.foundFiles?.length > 0 && (
-                <section className={styles.section}>
-                  <h3>Files ({trace.foundFiles.length})</h3>
-                  <ul className={styles.fileList}>
-                    {trace.foundFiles.map((f, i) => (
-                      <li key={i} className={styles.fileEntry}>
-                        <div className={styles.fileItem}>
-                          <span className={styles.filePath}>{f.path}</span>
-                          {f.confidence && <span className={styles.confidence}>{f.confidence}</span>}
-                          {f.matchReason && <span className={styles.matchReason}>{f.matchReason}</span>}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-
-              {trace.foundCommits?.length > 0 && (
-                <section className={styles.section}>
-                  <h3>Commits ({trace.foundCommits.length})</h3>
-                  {trace.project && <div className={styles.commitRepo}>{trace.project}</div>}
-                  <ul className={styles.commitList}>
-                    {trace.foundCommits.map((c, i) => {
-                      // Try to detect repo from commit message prefix (e.g., "floodboy-astro: ...")
-                      const repoMatch = c.message?.match(/^([a-zA-Z0-9_-]+):\s/);
-                      const org = trace.project?.split('/')[0] || 'LarisLabs';
-                      let targetProject = trace.project;
-                      if (repoMatch) {
-                        targetProject = `${org}/${repoMatch[1]}`;
-                      }
-                      const ghProject = targetProject?.includes('github.com') ? targetProject : `github.com/${targetProject}`;
-                      const commitUrl = targetProject ? `https://${ghProject}/commit/${c.hash}` : null;
-                      const displayHash = c.shortHash || c.hash?.slice(0, 7);
-                      return (
-                        <li key={i} className={styles.commitItem}>
-                          {commitUrl ? (
-                            <a href={commitUrl} target="_blank" rel="noopener noreferrer" className={styles.commitHash}>
-                              {displayHash}
-                            </a>
-                          ) : (
-                            <code className={styles.commitHash}>{displayHash}</code>
-                          )}
-                          <span className={styles.commitMessage}>{c.message}</span>
-                          {c.date && <span className={styles.commitDate}>{c.date}</span>}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
-              )}
-
-              {trace.foundIssues?.length > 0 && (
-                <section className={styles.section}>
-                  <h3>Issues ({trace.foundIssues.length})</h3>
-                  {trace.project && <div className={styles.issueRepo}>{trace.project}</div>}
-                  <ul className={styles.issueList}>
-                    {trace.foundIssues.map((issue, i) => {
-                      const issueUrl = issue.url || (trace.project ? `https://${trace.project}/issues/${issue.number}` : null);
-                      return (
-                        <li key={i} className={styles.issueItem}>
-                          <span className={`${styles.issueState} ${issue.state === 'open' ? styles.open : styles.closed}`}>
-                            #{issue.number}
-                          </span>
-                          {issueUrl ? (
-                            <a href={issueUrl} target="_blank" rel="noopener noreferrer" className={styles.issueTitle}>
-                              {issue.title}
-                            </a>
-                          ) : (
-                            <span className={styles.issueTitle}>{issue.title}</span>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
-              )}
-            </div>
+            {renderDigPoints(trace, true)}
           </div>
         ))}
 
@@ -824,28 +777,31 @@ export function Traces() {
       activeType={statusFilter}
       onTypeChange={setStatusFilter}
     >
-      <h1 className={styles.title}>Discovery Traces</h1>
-      <p className={styles.subtitle}>
+      <h1 className="text-[32px] font-semibold text-text-primary mb-3">Discovery Traces</h1>
+      <p className="text-text-secondary text-base mb-8">
         Your discovery journeys — what you searched and found
-        <span className={styles.philosophy}>"Trace → Dig → Distill → Awakening"</span>
+        <span className="block mt-2 italic text-accent text-sm">"Trace → Dig → Distill → Awakening"</span>
       </p>
 
       {loading ? (
-        <div className={styles.loading}>Loading traces...</div>
+        <div className="text-center py-20 px-6 text-text-muted flex flex-col items-center gap-3">
+          <Spinner size="md" />
+          Loading traces...
+        </div>
       ) : traces.length === 0 ? (
-        <div className={styles.empty}>
+        <div className="text-center py-20 px-6 text-text-muted">
           <p>No traces recorded yet.</p>
-          <p className={styles.hint}>
-            Use <code>/trace</code> or <code>oracle_trace()</code> to log discoveries.
+          <p className="mt-4 text-sm">
+            Use <code className="py-1 px-2 rounded text-accent" style={{ background: 'rgba(167, 139, 250, 0.15)' }}>/trace</code> or <code className="py-1 px-2 rounded text-accent" style={{ background: 'rgba(167, 139, 250, 0.15)' }}>oracle_trace()</code> to log discoveries.
           </p>
         </div>
       ) : (
         <>
-          <div className={styles.stats}>
+          <div className="text-text-muted text-sm mb-8 pb-4 border-b border-border">
             <span>{total} trace{total !== 1 ? 's' : ''} logged</span>
           </div>
 
-          <div className={styles.timeline}>
+          <div className="flex flex-col gap-10">
             {Object.entries(grouped).map(([date, items]) => {
               // Separate root traces and children
               const roots = items.filter(t => t.depth === 0 || !t.parentTraceId);
@@ -862,34 +818,34 @@ export function Traces() {
               const orphans = children.filter(c => !assignedChildren.has(c.traceId));
 
               return (
-                <div key={date} className={styles.dateGroup}>
-                  <h2 className={styles.date}>{date}</h2>
-                  <div className={styles.items}>
+                <div key={date} className="flex flex-col gap-5">
+                  <h2 className="text-sm font-semibold text-accent uppercase tracking-wide">{date}</h2>
+                  <div className="flex flex-col gap-4">
                     {tree.map(({ root, children }) => (
-                      <div key={root.traceId} className={styles.traceFamily}>
+                      <div key={root.traceId} className="flex flex-col">
                         {/* Parent trace */}
                         <div
-                          className={styles.item}
+                          className="bg-bg-card border border-border rounded-xl py-5 px-6 cursor-pointer transition-all duration-200 hover:border-accent hover:bg-[rgba(167,139,250,0.05)]"
                           onClick={() => navigate(`/traces/${root.traceId}`)}
                         >
-                          <div className={styles.itemHeader}>
-                            <span className={styles.queryText}>"{root.query}"</span>
+                          <div className="flex items-center justify-between gap-4 mb-3">
+                            <span className="text-base text-text-primary font-medium">"{root.query}"</span>
                             {getStatusBadge(root.status, root.hasAwakening)}
                           </div>
-                          <div className={styles.itemDigPoints}>
+                          <div className="text-sm text-text-secondary mb-3">
                             {getDigPointsPreview(root)}
                           </div>
-                          <div className={styles.itemMeta}>
-                            <code className={styles.traceId}>{root.traceId.slice(0, 8)}</code>
+                          <div className="flex items-center gap-4 text-xs text-text-muted">
+                            <code className="text-[11px] text-text-muted py-0.5 px-1.5 rounded" style={{ background: 'rgba(255, 255, 255, 0.05)' }}>{root.traceId.slice(0, 8)}</code>
                             {(root.prevTraceId || root.nextTraceId) && (
-                              <span className={styles.linkStatus}>
+                              <span className="text-[11px] text-accent py-0.5 px-2 rounded" style={{ background: 'rgba(167, 139, 250, 0.1)' }}>
                                 {root.prevTraceId && '←'}
                                 {root.prevTraceId && root.nextTraceId ? ' linked ' : root.prevTraceId ? ' first' : ''}
                                 {root.nextTraceId && '→'}
                                 {!root.nextTraceId && root.prevTraceId && ' last'}
                               </span>
                             )}
-                            <span className={styles.time}>
+                            <span className="text-text-muted">
                               {new Date(root.createdAt).toLocaleTimeString('en-US', {
                                 hour: '2-digit',
                                 minute: '2-digit'
@@ -899,32 +855,34 @@ export function Traces() {
                         </div>
                         {/* Children traces */}
                         {children.length > 0 && (
-                          <div className={styles.childTraces}>
+                          <div className="ml-6 pl-4 border-l-2 border-l-border flex flex-col gap-3 -mt-1 pt-3">
                             {children.map(child => (
                               <div
                                 key={child.traceId}
-                                className={`${styles.item} ${styles.childItem}`}
+                                className="bg-[rgba(0,0,0,0.2)] border border-[rgba(255,255,255,0.05)] rounded-xl py-5 px-6 cursor-pointer transition-all duration-200 hover:border-accent hover:bg-[rgba(167,139,250,0.05)]"
                                 onClick={() => navigate(`/traces/${child.traceId}`)}
                               >
-                                <div className={styles.itemHeader}>
-                                  <span className={styles.childIndicator}>↳</span>
-                                  <span className={styles.queryText}>"{child.query}"</span>
+                                <div className="flex items-center justify-between gap-4 mb-3">
+                                  <div>
+                                    <span className="text-accent mr-2 font-semibold">↳</span>
+                                    <span className="text-base text-text-primary font-medium">"{child.query}"</span>
+                                  </div>
                                   {getStatusBadge(child.status, child.hasAwakening)}
                                 </div>
-                                <div className={styles.itemDigPoints}>
+                                <div className="text-sm text-text-secondary mb-3">
                                   {getDigPointsPreview(child)}
                                 </div>
-                                <div className={styles.itemMeta}>
-                                  <code className={styles.traceId}>{child.traceId.slice(0, 8)}</code>
-                                  <span className={styles.depth}>depth {child.depth}</span>
+                                <div className="flex items-center gap-4 text-xs text-text-muted">
+                                  <code className="text-[11px] text-text-muted py-0.5 px-1.5 rounded" style={{ background: 'rgba(255, 255, 255, 0.05)' }}>{child.traceId.slice(0, 8)}</code>
+                                  <span className="py-0.5 px-2 rounded text-accent" style={{ background: 'rgba(167, 139, 250, 0.15)' }}>depth {child.depth}</span>
                                   {(child.prevTraceId || child.nextTraceId) && (
-                                    <span className={styles.linkStatus}>
+                                    <span className="text-[11px] text-accent py-0.5 px-2 rounded" style={{ background: 'rgba(167, 139, 250, 0.1)' }}>
                                       {child.prevTraceId && '←'}
                                       {child.nextTraceId && '→'}
                                       {!child.nextTraceId && child.prevTraceId && ' last'}
                                     </span>
                                   )}
-                                  <span className={styles.time}>
+                                  <span className="text-text-muted">
                                     {new Date(child.createdAt).toLocaleTimeString('en-US', {
                                       hour: '2-digit',
                                       minute: '2-digit'
@@ -941,20 +899,22 @@ export function Traces() {
                     {orphans.map(orphan => (
                       <div
                         key={orphan.traceId}
-                        className={`${styles.item} ${styles.childItem}`}
+                        className="bg-[rgba(0,0,0,0.2)] border border-[rgba(255,255,255,0.05)] rounded-xl py-5 px-6 cursor-pointer transition-all duration-200 hover:border-accent hover:bg-[rgba(167,139,250,0.05)]"
                         onClick={() => navigate(`/traces/${orphan.traceId}`)}
                       >
-                        <div className={styles.itemHeader}>
-                          <span className={styles.childIndicator}>↳</span>
-                          <span className={styles.queryText}>"{orphan.query}"</span>
+                        <div className="flex items-center justify-between gap-4 mb-3">
+                          <div>
+                            <span className="text-accent mr-2 font-semibold">↳</span>
+                            <span className="text-base text-text-primary font-medium">"{orphan.query}"</span>
+                          </div>
                           {getStatusBadge(orphan.status, orphan.hasAwakening)}
                         </div>
-                        <div className={styles.itemDigPoints}>
+                        <div className="text-sm text-text-secondary mb-3">
                           {getDigPointsPreview(orphan)}
                         </div>
-                        <div className={styles.itemMeta}>
-                          <span className={styles.depth}>depth {orphan.depth}</span>
-                          <span className={styles.time}>
+                        <div className="flex items-center gap-4 text-xs text-text-muted">
+                          <span className="py-0.5 px-2 rounded text-accent" style={{ background: 'rgba(167, 139, 250, 0.15)' }}>depth {orphan.depth}</span>
+                          <span className="text-text-muted">
                             {new Date(orphan.createdAt).toLocaleTimeString('en-US', {
                               hour: '2-digit',
                               minute: '2-digit'

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import * as THREE from 'three';
 import { getGraph, getFile } from '../api/oracle';
 import { useHandTracking } from '../hooks/useHandTracking';
-import styles from './Graph3D.module.css';
+// Tailwind classes replacing Graph3D.module.css
 
 interface Node {
   id: string;
@@ -829,14 +829,14 @@ export function Graph3D() {
   }, [nodes, links]);
 
   if (loading) {
-    return <div className={styles.loading}>Loading 3D graph...</div>;
+    return <div className="flex items-center justify-center h-full text-[#888] text-base">Loading 3D graph...</div>;
   }
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>Knowledge Graph 3D</h1>
-        <div className={styles.stats}>
+    <div className="p-5 h-full flex flex-col">
+      <div className="flex justify-between items-center mb-[15px]">
+        <h1 className="text-2xl font-semibold text-white">Knowledge Graph 3D</h1>
+        <div className="text-[#888] text-sm">
           {nodes.length} nodes · {links.length} links
           <button
             onClick={() => {
@@ -859,7 +859,7 @@ export function Graph3D() {
         </div>
       </div>
 
-      <div className={styles.legend}>
+      <div className="flex gap-5 mb-[15px] text-sm text-[#ccc]">
         {(() => {
           // Count nodes by type
           const counts: Record<string, number> = {};
@@ -878,7 +878,7 @@ export function Graph3D() {
             return (
               <button
                 key={key}
-                className={`${styles.legendItem} ${!typeFilter[key] ? styles.legendItemDisabled : ''}`}
+                className="flex items-center gap-2"
                 onClick={() => setTypeFilter(prev => ({ ...prev, [key]: !prev[key] }))}
                 style={{
                   opacity: typeFilter[key] ? 1 : 0.4,
@@ -894,7 +894,7 @@ export function Graph3D() {
                   fontSize: '13px'
                 }}
               >
-                <span className={styles.dot} style={{ background: color }}></span>
+                <span className="w-2.5 h-2.5 rounded-full" style={{ background: color }}></span>
                 {label} ({count})
               </button>
             );
@@ -902,15 +902,15 @@ export function Graph3D() {
         })()}
       </div>
 
-      <div className={styles.controls}>
-        <span className={styles.hint}>
+      <div className="mb-2.5 flex justify-between items-center">
+        <span className="text-text-muted text-xs">
           Drag to rotate • Scroll to zoom • Click to select
           {selectedNode && <strong> • {selectedNode.type}: {selectedNode.label?.slice(0, 30) || 'Unknown'}...</strong>}
         </span>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={toggleHandMode}
-            className={styles.hudToggle}
+            className="bg-[rgba(167,139,250,0.2)] border border-[#a78bfa] text-[#a78bfa] px-3 py-1.5 rounded-md text-xs cursor-pointer transition-all duration-200 hover:bg-[rgba(167,139,250,0.3)]"
             style={{
               background: handTracking ? '#4ade80' : undefined,
               color: handTracking ? '#000' : undefined
@@ -918,26 +918,27 @@ export function Graph3D() {
           >
             {handTracking ? '✋ Hand ON' : '✋ Hand'}
           </button>
-          <button onClick={resetCamera} className={styles.hudToggle}>Reset</button>
+          <button onClick={resetCamera} className="bg-[rgba(167,139,250,0.2)] border border-[#a78bfa] text-[#a78bfa] px-3 py-1.5 rounded-md text-xs cursor-pointer transition-all duration-200 hover:bg-[rgba(167,139,250,0.3)]">Reset</button>
           <button
             onClick={() => setShowHud(!showHud)}
-            className={styles.hudToggle}
+            className="bg-[rgba(167,139,250,0.2)] border border-[#a78bfa] text-[#a78bfa] px-3 py-1.5 rounded-md text-xs cursor-pointer transition-all duration-200 hover:bg-[rgba(167,139,250,0.3)]"
           >
             {showHud ? 'Hide' : 'Show'}
           </button>
         </div>
       </div>
 
-      <div ref={containerRef} className={styles.canvas}>
+      <div ref={containerRef} className="flex-1 min-h-[600px] h-[calc(100vh-200px)] rounded-xl overflow-hidden bg-bg-primary border border-[#222] relative">
         {showHud && (
           <div
-              className={styles.hud}
+              className="absolute top-[15px] right-[15px] rounded-[10px] p-[15px] min-w-[200px] z-[100] backdrop-blur-[10px] pointer-events-auto border border-[#333]"
+              style={{ background: 'rgba(15, 15, 25, 0.95)' }}
               onMouseEnter={() => { hudHoveredRef.current = true; }}
               onMouseLeave={() => { hudHoveredRef.current = false; }}
             >
-            <div className={styles.hudTitle}>Controls</div>
+            <div className="text-sm font-semibold text-[#a78bfa] mb-3 pb-2 border-b border-[#333]">Controls</div>
 
-            <label className={styles.hudLabel} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <label className="block text-[11px] text-[#888] mb-2.5" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
               <input
                 type="checkbox"
                 checked={sphereMode}
@@ -947,7 +948,7 @@ export function Graph3D() {
               <span style={{ color: '#a78bfa' }}>Sphere Mode</span>
             </label>
 
-            <label className={styles.hudLabel}>
+            <label className="block text-[11px] text-[#888] mb-2.5">
               Camera Distance: {camDistance}
               <input
                 type="range"
@@ -956,11 +957,11 @@ export function Graph3D() {
                 step="1"
                 value={camDistance}
                 onChange={(e) => setCamDistance(Number(e.target.value))}
-                className={styles.hudSlider}
+                className="hud-slider"
               />
             </label>
 
-            <label className={styles.hudLabel}>
+            <label className="block text-[11px] text-[#888] mb-2.5">
               Node Size: {nodeSize.toFixed(2)}
               <input
                 type="range"
@@ -969,11 +970,11 @@ export function Graph3D() {
                 step="0.01"
                 value={nodeSize}
                 onChange={(e) => setNodeSize(Number(e.target.value))}
-                className={styles.hudSlider}
+                className="hud-slider"
               />
             </label>
 
-            <label className={styles.hudLabel}>
+            <label className="block text-[11px] text-[#888] mb-2.5">
               Rotation Speed: {rotationSpeed.toFixed(3)}
               <input
                 type="range"
@@ -982,11 +983,11 @@ export function Graph3D() {
                 step="0.005"
                 value={rotationSpeed}
                 onChange={(e) => setRotationSpeed(Number(e.target.value))}
-                className={styles.hudSlider}
+                className="hud-slider"
               />
             </label>
 
-            <label className={styles.hudLabel}>
+            <label className="block text-[11px] text-[#888] mb-2.5">
               Link Opacity: {linkOpacity.toFixed(2)}
               <input
                 type="range"
@@ -995,11 +996,11 @@ export function Graph3D() {
                 step="0.01"
                 value={linkOpacity}
                 onChange={(e) => setLinkOpacity(Number(e.target.value))}
-                className={styles.hudSlider}
+                className="hud-slider"
               />
             </label>
 
-            <label className={styles.hudLabel}>
+            <label className="block text-[11px] text-[#888] mb-2.5">
               Breathing: {breathingIntensity.toFixed(2)}
               <input
                 type="range"
@@ -1008,13 +1009,13 @@ export function Graph3D() {
                 step="0.01"
                 value={breathingIntensity}
                 onChange={(e) => setBreathingIntensity(Number(e.target.value))}
-                className={styles.hudSlider}
+                className="hud-slider"
               />
             </label>
 
-            <div className={styles.hudDivider}>Lighting</div>
+            <div className="text-[10px] text-text-muted uppercase tracking-widest mt-3 mb-2 pt-2 border-t border-[#333]">Lighting</div>
 
-            <label className={styles.hudLabel}>
+            <label className="block text-[11px] text-[#888] mb-2.5">
               Ambient: {ambientLight.toFixed(1)}
               <input
                 type="range"
@@ -1023,11 +1024,11 @@ export function Graph3D() {
                 step="0.1"
                 value={ambientLight}
                 onChange={(e) => setAmbientLight(Number(e.target.value))}
-                className={styles.hudSlider}
+                className="hud-slider"
               />
             </label>
 
-            <label className={styles.hudLabel}>
+            <label className="block text-[11px] text-[#888] mb-2.5">
               Direct: {directLight.toFixed(1)}
               <input
                 type="range"
@@ -1036,13 +1037,13 @@ export function Graph3D() {
                 step="0.1"
                 value={directLight}
                 onChange={(e) => setDirectLight(Number(e.target.value))}
-                className={styles.hudSlider}
+                className="hud-slider"
               />
             </label>
 
-            <div className={styles.hudDivider}>Links</div>
+            <div className="text-[10px] text-text-muted uppercase tracking-widest mt-3 mb-2 pt-2 border-t border-[#333]">Links</div>
 
-            <label className={styles.hudLabel} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label className="block text-[11px] text-[#888] mb-2.5" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <input
                 type="checkbox"
                 checked={showAllLinks}
@@ -1052,7 +1053,7 @@ export function Graph3D() {
               Show All Links
             </label>
 
-            <label className={styles.hudLabel}>
+            <label className="block text-[11px] text-[#888] mb-2.5">
               Particle Speed: {particleSpeed.toFixed(2)}
               <input
                 type="range"
@@ -1061,11 +1062,11 @@ export function Graph3D() {
                 step="0.05"
                 value={particleSpeed}
                 onChange={(e) => setParticleSpeed(Number(e.target.value))}
-                className={styles.hudSlider}
+                className="hud-slider"
               />
             </label>
 
-            <label className={styles.hudLabel}>
+            <label className="block text-[11px] text-[#888] mb-2.5">
               Link Opacity: {linkOpacity.toFixed(2)}
               <input
                 type="range"
@@ -1074,7 +1075,7 @@ export function Graph3D() {
                 step="0.05"
                 value={linkOpacity}
                 onChange={(e) => setLinkOpacity(Number(e.target.value))}
-                className={styles.hudSlider}
+                className="hud-slider"
               />
             </label>
           </div>
@@ -1082,11 +1083,11 @@ export function Graph3D() {
       </div>
 
       {(hoveredNode || selectedNode) && !showFilePanel && (
-        <div className={styles.tooltip} style={{ maxWidth: '350px' }}>
-          <span className={styles.nodeType}>
+        <div className="fixed bottom-[30px] left-1/2 -translate-x-1/2 rounded-[10px] border border-[#333] max-w-[400px] text-center z-[100] backdrop-blur-[10px] px-5 py-3" style={{ background: 'rgba(20, 20, 30, 0.95)', maxWidth: '350px' }}>
+          <span className="inline-block px-2 py-0.5 rounded text-[11px] uppercase tracking-wide mb-1.5" style={{ background: 'rgba(167, 139, 250, 0.2)', color: '#a78bfa' }}>
             {selectedNode ? `🔒 ${selectedNode.type}` : hoveredNode?.type}
           </span>
-          <p className={styles.nodeLabel} style={{
+          <p className="text-text-primary text-sm m-0 leading-snug" style={{
             fontSize: '14px',
             fontWeight: 'bold',
             margin: '8px 0',
