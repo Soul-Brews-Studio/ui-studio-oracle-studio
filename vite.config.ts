@@ -20,7 +20,7 @@ function oracleAutoStart() {
     configureServer() {
       try {
         execSync('bun run server:ensure', {
-          cwd: resolve(__dirname, '../oracle-v2'),
+          cwd: resolve(__dirname, '../arra-oracle'),
           timeout: 15000,
           stdio: 'pipe',
         })

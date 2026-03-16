@@ -234,7 +234,7 @@ export const CommandPalette = memo(function CommandPalette({ onClose }: CommandP
         {/* Footer */}
         <div className={styles.footer}>
           <span><kbd>Enter</kbd> search · <kbd>↑↓</kbd> navigate · <kbd>Esc</kbd> close · double-click → detail</span>
-          <span>oracle-v2</span>
+          <span>arra-oracle</span>
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 # Oracle Studio
 
-React dashboard for [oracle-v2](https://github.com/Soul-Brews-Studio/oracle-v2) API.
+React dashboard for [arra-oracle](https://github.com/Soul-Brews-Studio/arra-oracle) API.
 
 ## Quick Start
 
@@ -8,7 +8,7 @@ React dashboard for [oracle-v2](https://github.com/Soul-Brews-Studio/oracle-v2) 
 bunx oracle-studio
 ```
 
-Serves the dashboard on http://localhost:3000, proxying API requests to oracle-v2 on port 47778.
+Serves the dashboard on http://localhost:3000, proxying API requests to arra-oracle on port 47778.
 
 ### Options
 
@@ -19,10 +19,10 @@ bunx oracle-studio --api http://host:47778  # custom API URL
 
 ## Development
 
-Start the oracle-v2 API server first:
+Start the arra-oracle API server first:
 
 ```bash
-# In your oracle-v2 repo
+# In your arra-oracle repo
 bun run server  # http://localhost:47778
 ```
 

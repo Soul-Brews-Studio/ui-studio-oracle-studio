@@ -2,7 +2,7 @@
   "name": "oracle-studio",
   "version": "0.8.0",
   "type": "module",
-  "description": "React dashboard for oracle-v2 API",
+  "description": "React dashboard for arra-oracle API",
   "bin": {
     "oracle-studio": "./bin/serve.ts"
   },
