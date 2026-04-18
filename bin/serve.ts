@@ -38,8 +38,17 @@ const API_URL = getArg('--api', 'http://localhost:47778');
 const DIST = join(import.meta.dirname, '..', 'dist');
 
 if (!existsSync(DIST)) {
-  console.error('Error: dist/ not found. Run `bun run build` first, or install the published package.');
-  process.exit(1);
+  const projectRoot = join(import.meta.dirname, '..');
+  console.log('📦 dist/ not found — building once (~10s)…');
+  const result = Bun.spawnSync(['bun', 'run', 'build'], {
+    cwd: projectRoot,
+    stdout: 'inherit',
+    stderr: 'inherit',
+  });
+  if (result.exitCode !== 0 || !existsSync(DIST)) {
+    console.error('Error: build failed or dist/ still missing. Try `cd` into the package and run `bun run build`.');
+    process.exit(1);
+  }
 }
 
 const MIME: Record<string, string> = {
