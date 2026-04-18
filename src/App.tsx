@@ -20,6 +20,7 @@ import { CommandPalette } from './components/CommandPalette';
 import { Map } from './pages/Map';
 import { Schedule } from './pages/Schedule';
 import { Pulse } from './pages/Pulse';
+import { Plugins } from './pages/Plugins';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { getStats } from './api/oracle';
 import { setVaultRepo } from './utils/docDisplay';
@@ -79,6 +80,7 @@ function AppContent() {
         <Route path="/traces/:id" element={<RequireAuth><Traces /></RequireAuth>} />
         <Route path="/superseded" element={<RequireAuth><Superseded /></RequireAuth>} />
         <Route path="/pulse" element={<RequireAuth><Pulse /></RequireAuth>} />
+        <Route path="/plugins" element={<RequireAuth><Plugins /></RequireAuth>} />
         <Route path="/schedule" element={<RequireAuth><Schedule /></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
       </Routes>
