@@ -20,7 +20,7 @@ function getArg(flag: string, fallback: string): string {
 
 if (args.includes('--help') || args.includes('-h')) {
   console.log(`
-Oracle Studio — React dashboard for oracle-v2
+Oracle Studio — React dashboard for arra-oracle
 
 Usage:
   oracle-studio [options]
@@ -68,7 +68,7 @@ Bun.serve({
   async fetch(req) {
     const url = new URL(req.url);
 
-    // Proxy /api/* to oracle-v2
+    // Proxy /api/* to arra-oracle
     if (url.pathname.startsWith('/api/')) {
       const target = `${API_URL}${url.pathname}${url.search}`;
       const headers = new Headers(req.headers);

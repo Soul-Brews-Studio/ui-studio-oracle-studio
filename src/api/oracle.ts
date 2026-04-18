@@ -261,6 +261,30 @@ export async function getFeed(opts?: { limit?: number; oracle?: string; event?: 
 }
 
 // ============================================================================
+// WASM Plugins API
+// ============================================================================
+
+export interface PluginInfo {
+  name: string;
+  file: string;
+  size: number;
+  modified: string;
+}
+
+export async function getPlugins(): Promise<{ plugins: PluginInfo[] }> {
+  const res = await fetch(`${API_BASE}/plugins`);
+  return res.json();
+}
+
+export async function loadPlugin(name: string): Promise<WebAssembly.Instance> {
+  const res = await fetch(`${API_BASE}/plugins/${name}`);
+  const bytes = await res.arrayBuffer();
+  const mod = await WebAssembly.compile(bytes);
+  const inst = await WebAssembly.instantiate(mod);
+  return inst;
+}
+
+// ============================================================================
 // Auth API
 // ============================================================================
 
