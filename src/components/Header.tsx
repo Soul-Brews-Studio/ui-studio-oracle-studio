@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { API_BASE } from '../api/oracle';
 import { apiUrl, hostLabel, isDefault, setStoredHost, clearStoredHost } from '../api/host';
 
-type NavItem = { path: string; label: string };
+type NavItem = { path: string; label: string; studio?: string };
 
 const FALLBACK_NAV: NavItem[] = [
   { path: '/', label: 'Overview' },
@@ -26,71 +26,18 @@ const FALLBACK_TOOLS: NavItem[] = [
   { path: '/schedule', label: 'Schedule' },
 ];
 
-// API path → studio route. Longer keys are matched first (so /api/supersede
-// matches before any bare prefix). Unmapped tagged paths are skipped.
-const API_TO_STUDIO: Array<[string, string]> = [
-  ['/api/supersede', '/superseded'],
-  ['/api/search', '/search'],
-  ['/api/list', '/feed'],
-  ['/api/reflect', '/playground'],
-  ['/api/threads', '/forum'],
-  ['/api/traces', '/traces'],
-  ['/api/schedule', '/schedule'],
-  ['/api/plugins', '/plugins'],
-  ['/api/graph', '/map'],
-  ['/api/map3d', '/map'],
-  ['/api/map', '/map'],
-  ['/api/context', '/evolution'],
-  ['/api/stats', '/pulse'],
-];
-
-const CACHE_KEY = 'oracle_studio_swagger_nav_v1';
+const CACHE_KEY = 'oracle_studio_menu_v1';
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 type NavSet = { main: NavItem[]; tools: NavItem[] };
 
-function studioPathFor(apiPath: string): string | null {
-  for (const [prefix, studio] of API_TO_STUDIO) {
-    if (apiPath === prefix || apiPath.startsWith(prefix + '/')) return studio;
-  }
-  return null;
-}
-
-function parseSwaggerNav(spec: any): NavSet | null {
-  const main: Array<NavItem & { order: number }> = [];
-  const tools: Array<NavItem & { order: number }> = [];
-  const seen = new Set<string>();
-  const paths = spec?.paths ?? {};
-  for (const [apiPath, methods] of Object.entries(paths)) {
-    if (!methods || typeof methods !== 'object') continue;
-    for (const op of Object.values(methods as Record<string, any>)) {
-      const tags: string[] = Array.isArray(op?.tags) ? op.tags : [];
-      const group: 'main' | 'tools' | null = tags.includes('nav:main')
-        ? 'main'
-        : tags.includes('nav:tools')
-        ? 'tools'
-        : null;
-      if (!group) continue;
-      const studio = studioPathFor(apiPath);
-      if (!studio) continue;
-      const key = `${group}:${studio}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const orderTag = tags.find((t) => t.startsWith('order:'));
-      const order = orderTag ? parseInt(orderTag.slice('order:'.length), 10) : 999;
-      const label: string = typeof op?.summary === 'string' && op.summary ? op.summary : studio.replace('/', '') || 'Home';
-      (group === 'main' ? main : tools).push({ path: studio, label, order });
-    }
-  }
-  if (main.length === 0 && tools.length === 0) return null;
-  const byOrder = (a: { order: number }, b: { order: number }) => a.order - b.order;
-  main.sort(byOrder);
-  tools.sort(byOrder);
-  return {
-    main: main.map(({ path, label }) => ({ path, label })),
-    tools: tools.map(({ path, label }) => ({ path, label })),
-  };
-}
+type MenuApiItem = {
+  path: string;
+  label: string;
+  group?: string;
+  order?: number;
+  studio?: string;
+};
 
 function readCachedNav(): NavSet | null {
   try {
@@ -136,16 +83,37 @@ export function Header() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(apiUrl('/swagger/json'));
+        const res = await fetch(apiUrl('/api/menu'));
         if (!res.ok) return;
-        const spec = await res.json();
-        const parsed = parseSwaggerNav(spec);
-        if (!parsed || cancelled) return;
-        // Overview (`/`) isn't in swagger; keep it pinned at the front of main.
-        const main = parsed.main.some((n) => n.path === '/')
-          ? parsed.main
-          : [{ path: '/', label: 'Overview' }, ...parsed.main];
-        const next = { main, tools: parsed.tools };
+        const data = await res.json();
+        const items: MenuApiItem[] = Array.isArray(data?.items) ? data.items : [];
+        if (cancelled || items.length === 0) return;
+        const main: Array<NavItem & { order: number }> = [];
+        const tools: Array<NavItem & { order: number }> = [];
+        for (const item of items) {
+          if (!item || typeof item.path !== 'string' || typeof item.label !== 'string') continue;
+          const bucket = item.group === 'tools' ? tools : item.group === 'main' ? main : null;
+          if (!bucket) continue;
+          const entry: NavItem & { order: number } = {
+            path: item.path,
+            label: item.label,
+            order: typeof item.order === 'number' ? item.order : 999,
+          };
+          if (typeof item.studio === 'string' && item.studio) entry.studio = item.studio;
+          bucket.push(entry);
+        }
+        const byOrder = (a: { order: number }, b: { order: number }) => a.order - b.order;
+        main.sort(byOrder);
+        tools.sort(byOrder);
+        const strip = ({ path, label, studio }: NavItem & { order: number }): NavItem =>
+          studio ? { path, label, studio } : { path, label };
+        const mainItems = main.map(strip);
+        const next = {
+          main: mainItems.some((n) => n.path === '/' && !n.studio)
+            ? mainItems
+            : [{ path: '/', label: 'Overview' }, ...mainItems],
+          tools: tools.map(strip),
+        };
         setNav(next);
         writeCachedNav(next);
       } catch {
@@ -185,6 +153,12 @@ export function Header() {
   const duration = mins < 60 ? `${mins}m` : `${Math.floor(mins / 60)}h ${mins % 60}m`;
 
   const isActive = (path: string) => location.pathname === path.split('?')[0];
+
+  const currentHost = hostLabel().replace(' (default)', '');
+
+  function studioHref(item: NavItem): string {
+    return `https://${item.studio}${item.path}?host=${encodeURIComponent(currentHost)}`;
+  }
 
   return (
     <header className="bg-bg-secondary border-b border-border sticky top-0 z-50">
@@ -250,17 +224,27 @@ export function Header() {
       {/* Nav row: full width, scrollable */}
       <nav className="flex items-center gap-0.5 px-4 pb-2 flex-wrap">
         {navItems.map(item => (
-          <Link
-            key={item.path}
-            to={item.path}
-            className={`px-2.5 py-1.5 rounded-lg text-[13px] whitespace-nowrap transition-all duration-150 ${
-              isActive(item.path)
-                ? 'bg-accent/15 text-accent font-semibold border border-accent/20'
-                : 'text-text-secondary hover:bg-bg-card hover:text-accent border border-transparent'
-            }`}
-          >
-            {item.label}
-          </Link>
+          item.studio ? (
+            <a
+              key={`${item.studio}${item.path}`}
+              href={studioHref(item)}
+              className="px-2.5 py-1.5 rounded-lg text-[13px] whitespace-nowrap transition-all duration-150 text-text-secondary hover:bg-bg-card hover:text-accent border border-transparent"
+            >
+              {item.label}
+            </a>
+          ) : (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`px-2.5 py-1.5 rounded-lg text-[13px] whitespace-nowrap transition-all duration-150 ${
+                isActive(item.path)
+                  ? 'bg-accent/15 text-accent font-semibold border border-accent/20'
+                  : 'text-text-secondary hover:bg-bg-card hover:text-accent border border-transparent'
+              }`}
+            >
+              {item.label}
+            </Link>
+          )
         ))}
 
         <span className="w-px h-4 bg-border mx-2" />
@@ -287,18 +271,29 @@ export function Header() {
               <div className="absolute top-full left-0 right-0 h-2" />
               <div className="absolute top-[calc(100%+4px)] right-0 bg-bg-card border border-border rounded-xl p-1 min-w-[140px] shadow-lg z-[200]">
                 {toolsItems.map(item => (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={`block px-3 py-2 rounded-lg text-[13px] whitespace-nowrap transition-all duration-150 ${
-                      isActive(item.path)
-                        ? 'bg-accent/10 text-accent'
-                        : 'text-text-secondary hover:bg-white/5 hover:text-accent'
-                    }`}
-                    onClick={() => setToolsOpen(false)}
-                  >
-                    {item.label}
-                  </Link>
+                  item.studio ? (
+                    <a
+                      key={`${item.studio}${item.path}`}
+                      href={studioHref(item)}
+                      className="block px-3 py-2 rounded-lg text-[13px] whitespace-nowrap transition-all duration-150 text-text-secondary hover:bg-white/5 hover:text-accent"
+                      onClick={() => setToolsOpen(false)}
+                    >
+                      {item.label}
+                    </a>
+                  ) : (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={`block px-3 py-2 rounded-lg text-[13px] whitespace-nowrap transition-all duration-150 ${
+                        isActive(item.path)
+                          ? 'bg-accent/10 text-accent'
+                          : 'text-text-secondary hover:bg-white/5 hover:text-accent'
+                      }`}
+                      onClick={() => setToolsOpen(false)}
+                    >
+                      {item.label}
+                    </Link>
+                  )
                 ))}
               </div>
             </>
