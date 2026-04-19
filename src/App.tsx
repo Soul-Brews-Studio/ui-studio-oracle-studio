@@ -17,6 +17,7 @@ import { Settings } from './pages/Settings';
 import { Playground } from './pages/Playground';
 import { Compare } from './pages/Compare';
 import { CommandPalette } from './components/CommandPalette';
+import { BackendGate } from './components/BackendGate';
 import { Map } from './pages/Map';
 import { Schedule } from './pages/Schedule';
 import { Pulse } from './pages/Pulse';
@@ -98,9 +99,11 @@ function App() {
 
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
+      <BackendGate>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </BackendGate>
     </BrowserRouter>
   );
 }
