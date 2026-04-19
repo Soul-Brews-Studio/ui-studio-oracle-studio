@@ -28,6 +28,9 @@
     "test:ui": "bunx playwright test --ui"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@types/three": "^0.182.0",
     "knowledge-map-3d": "github:Bombbaza/Multi-Planet-System-Knowledge-Map-3D",
     "ml5": "1",
