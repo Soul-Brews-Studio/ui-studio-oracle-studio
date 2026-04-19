@@ -41,7 +41,12 @@ export function isStudioHost(): boolean {
 /** Paths that should jump cross-origin to vector.* from the studio bundle. */
 function isVectorPath(path: string): boolean {
   const clean = path.split('?')[0];
-  return clean === '/playground' || clean.startsWith('/playground/');
+  return (
+    clean === '/playground' ||
+    clean.startsWith('/playground/') ||
+    clean === '/compare' ||
+    clean.startsWith('/compare/')
+  );
 }
 
 type NavSet = { main: NavItem[]; tools: NavItem[] };
