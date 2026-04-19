@@ -20,6 +20,14 @@ export default {
         headers: { "cache-control": "no-store" },
       });
     }
+    if (
+      url.hostname === "vector-playground.buildwithoracle.com" &&
+      (url.pathname === "/" || url.pathname === "/index.html")
+    ) {
+      const rewritten = new URL(request.url);
+      rewritten.pathname = "/playground";
+      return env.ASSETS.fetch(new Request(rewritten.toString(), request));
+    }
     return env.ASSETS.fetch(request);
   },
 };
