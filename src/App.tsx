@@ -25,6 +25,7 @@ import { Plugins } from './pages/Plugins';
 import { Sessions } from './pages/Sessions';
 import { Canvas } from './pages/Canvas';
 import { Planets } from './pages/Planets';
+import { MenuEditor } from './pages/MenuEditor';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { getStats } from './api/oracle';
 import { setVaultRepo } from './utils/docDisplay';
@@ -91,6 +92,7 @@ function AppContent() {
         <Route path="/plugins" element={<RequireAuth><Plugins /></RequireAuth>} />
         <Route path="/schedule" element={<RequireAuth><Schedule /></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
+        <Route path="/menu" element={<RequireAuth><MenuEditor /></RequireAuth>} />
       </Routes>
 
     </>
