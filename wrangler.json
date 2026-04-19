@@ -8,6 +8,10 @@
     {
       "pattern": "studio.buildwithoracle.com",
       "custom_domain": true
+    },
+    {
+      "pattern": "vector-playground.buildwithoracle.com",
+      "custom_domain": true
     }
   ],
   "assets": {
