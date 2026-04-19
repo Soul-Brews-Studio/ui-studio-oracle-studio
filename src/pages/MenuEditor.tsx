@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { API_BASE } from '../api/oracle';
+import { cacheBus } from '../lib/cache';
 import {
   DndContext,
   closestCenter,
@@ -49,6 +50,7 @@ export function MenuEditor() {
     try {
       const res = await fetch(`${API_BASE}/menu/items/${id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) });
       if (!res.ok) throw new Error(`patch ${res.status}`);
+      cacheBus.invalidate('menu');
       showToast('Saved'); await load();
     } catch (e) { showToast(`Error: ${e instanceof Error ? e.message : e}`); }
   }
@@ -56,6 +58,7 @@ export function MenuEditor() {
     try {
       const res = await fetch(`${API_BASE}/menu/reset/${id}`, { method: 'POST' });
       if (!res.ok) throw new Error(`reset ${res.status}`);
+      cacheBus.invalidate('menu');
       showToast('Reset'); await load();
     } catch (e) { showToast(`Error: ${e instanceof Error ? e.message : e}`); }
   }
@@ -64,6 +67,7 @@ export function MenuEditor() {
     try {
       const res = await fetch(`${API_BASE}/menu/items/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`delete ${res.status}`);
+      cacheBus.invalidate('menu');
       showToast('Deleted'); await load();
     } catch (e) { showToast(`Error: ${e instanceof Error ? e.message : e}`); }
   }
@@ -73,6 +77,7 @@ export function MenuEditor() {
     try {
       const res = await fetch(`${API_BASE}/menu/items`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path, label, group: 'main', order: 999, source: 'custom', access: 'public' }) });
       if (!res.ok) throw new Error(`create ${res.status}`);
+      cacheBus.invalidate('menu');
       showToast('Created'); await load();
     } catch (e) { showToast(`Error: ${e instanceof Error ? e.message : e}`); }
   }
@@ -93,6 +98,7 @@ export function MenuEditor() {
     try {
       const res = await fetch(`${API_BASE}/menu/reorder`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ items: payload }) });
       if (!res.ok) throw new Error(`reorder ${res.status}`);
+      cacheBus.invalidate('menu');
       showToast('Reordered'); await load();
     } catch (e) { showToast(`Error: ${e instanceof Error ? e.message : e}`); await load(); }
   }

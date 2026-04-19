@@ -7,10 +7,16 @@
 //
 // See ./host.ts for the full API (setStoredHost, clearStoredHost, getRecentHosts, wsUrl…).
 import { apiUrl } from './host';
+import { cached } from '../lib/cache';
 export { apiUrl } from './host';
 
 /** Resolved base for Oracle API (e.g. `/api` or `https://mba.wg:47778/api`). */
 export const API_BASE = apiUrl('/api');
+
+// Cache TTLs — see Phase 2 of #41. Invalidation tags drive `cacheBus.invalidate(tag)`.
+const ONE_HOUR = 60 * 60 * 1000;
+const ONE_DAY = 24 * ONE_HOUR;
+const TEN_MIN = 10 * 60 * 1000;
 
 /** Strip project prefix from source_file for display (vault-indexed cross-project docs) */
 export function stripProjectPrefix(sourceFile: string, project?: string): string {
@@ -76,27 +82,35 @@ export async function search(
 ): Promise<SearchResult & { mode?: string; model?: string; warning?: string }> {
   const params = new URLSearchParams({ q: query, type, limit: String(limit), mode });
   if (model) params.set('model', model);
-  const res = await fetch(`${API_BASE}/search?${params}`);
-  return res.json();
+  const qs = params.toString();
+  return cached(`search:${qs}`, TEN_MIN, async () => {
+    const res = await fetch(`${API_BASE}/search?${qs}`);
+    return res.json();
+  }, { tag: 'search' });
 }
 
 // List/browse documents
 export async function list(type: string = 'all', limit: number = 20, offset: number = 0): Promise<{ results: Document[]; total: number }> {
   const params = new URLSearchParams({ type, limit: String(limit), offset: String(offset) });
-  const res = await fetch(`${API_BASE}/list?${params}`);
-  return res.json();
+  const qs = params.toString();
+  return cached(`list:${type}:${qs}`, ONE_HOUR, async () => {
+    const res = await fetch(`${API_BASE}/list?${qs}`);
+    return res.json();
+  }, { tag: `list:${type}` });
 }
 
 // Get stats
 export async function getStats(): Promise<Stats> {
-  const res = await fetch(`${API_BASE}/stats`);
-  if (!res.ok) {
-    throw new Error(`Server error: ${res.status}`);
-  }
-  return res.json();
+  return cached('stats', ONE_HOUR, async () => {
+    const res = await fetch(`${API_BASE}/stats`);
+    if (!res.ok) {
+      throw new Error(`Server error: ${res.status}`);
+    }
+    return res.json();
+  }, { tag: 'stats' });
 }
 
-// Get random wisdom
+// Get random wisdom — no cache (always return a fresh reflection).
 export async function reflect(): Promise<Document> {
   const res = await fetch(`${API_BASE}/reflect`);
   return res.json();
@@ -141,15 +155,20 @@ export async function getFile(filePath: string, project?: string): Promise<{ con
 
 // Get document by ID
 export async function getDoc(id: string): Promise<Document & { error?: string }> {
-  const res = await fetch(`${API_BASE}/doc/${encodeURIComponent(id)}`);
-  return res.json();
+  return cached(`doc:${id}`, ONE_DAY, async () => {
+    const res = await fetch(`${API_BASE}/doc/${encodeURIComponent(id)}`);
+    return res.json();
+  }, { tag: 'doc' });
 }
 
 // Get similar documents (vector nearest neighbors)
 export async function getSimilar(docId: string, limit: number = 5): Promise<{ results: Document[]; docId: string }> {
   const params = new URLSearchParams({ id: docId, limit: String(limit) });
-  const res = await fetch(`${API_BASE}/similar?${params}`);
-  return res.json();
+  const qs = params.toString();
+  return cached(`similar:${docId}:${limit}`, ONE_DAY, async () => {
+    const res = await fetch(`${API_BASE}/similar?${qs}`);
+    return res.json();
+  }, { tag: 'similar' });
 }
 
 // Get knowledge map data (2D projection)
@@ -185,8 +204,10 @@ export async function getOracles(): Promise<{
   total_projects: number;
   total_identities: number;
 }> {
-  const res = await fetch(`${API_BASE}/oracles`);
-  return res.json();
+  return cached('oracles', ONE_DAY, async () => {
+    const res = await fetch(`${API_BASE}/oracles`);
+    return res.json();
+  }, { tag: 'oracles' });
 }
 
 export async function getMap(): Promise<{ documents: MapDocument[]; total: number }> {
@@ -196,8 +217,11 @@ export async function getMap(): Promise<{ documents: MapDocument[]; total: numbe
 
 export async function getMap3d(model?: string): Promise<{ documents: MapDocument[]; total: number; pca_info?: any }> {
   const params = model ? `?model=${encodeURIComponent(model)}` : '';
-  const res = await fetch(`${API_BASE}/map3d${params}`);
-  return res.json();
+  const key = `map3d:${model ?? 'default'}`;
+  return cached(key, ONE_DAY, async () => {
+    const res = await fetch(`${API_BASE}/map3d${params}`);
+    return res.json();
+  }, { tag: 'map3d', store: 'idb' });
 }
 
 // Dashboard types

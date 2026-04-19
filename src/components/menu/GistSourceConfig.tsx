@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { API_BASE } from '../../api/oracle';
+import { cacheBus } from '../../lib/cache';
 
 interface SourceInfo {
   url: string | null;
@@ -75,6 +76,7 @@ export function GistSourceConfig({ onChanged, showToast }: Props) {
         body: JSON.stringify({ url, mode }),
       });
       if (!res.ok) throw new Error(`load ${res.status}`);
+      cacheBus.invalidate('menu');
       showToast(`Loaded (${mode})`);
       await fetchSource();
       await onChanged();
@@ -87,6 +89,7 @@ export function GistSourceConfig({ onChanged, showToast }: Props) {
     try {
       const res = await fetch(`${API_BASE}/menu/source`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`clear ${res.status}`);
+      cacheBus.invalidate('menu');
       showToast('Cleared');
       await fetchSource();
       await onChanged();
@@ -99,6 +102,7 @@ export function GistSourceConfig({ onChanged, showToast }: Props) {
     try {
       const res = await fetch(`${API_BASE}/menu/reload`, { method: 'POST' });
       if (!res.ok) throw new Error(`reload ${res.status}`);
+      cacheBus.invalidate('menu');
       showToast('Reloaded');
       await fetchSource();
       await onChanged();
@@ -112,6 +116,7 @@ export function GistSourceConfig({ onChanged, showToast }: Props) {
     try {
       const res = await fetch(`${API_BASE}/menu/reset-all`, { method: 'POST' });
       if (!res.ok) throw new Error(`reset-all ${res.status}`);
+      cacheBus.invalidate('menu');
       showToast('Reset to defaults');
       await fetchSource();
       await onChanged();

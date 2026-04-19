@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE } from '../api/oracle';
 import { apiUrl, hostLabel, isDefault, setStoredHost, clearStoredHost } from '../api/host';
+import { cached } from '../lib/cache';
 
 type NavItem = { path: string; label: string; studio?: string };
 
@@ -26,8 +27,8 @@ const FALLBACK_TOOLS: NavItem[] = [
   { path: '/schedule', label: 'Schedule' },
 ];
 
-const CACHE_KEY = 'oracle_studio_menu_v1';
-const CACHE_TTL_MS = 5 * 60 * 1000;
+const MENU_CACHE_KEY = 'header:menu';
+const MENU_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const VECTOR_ORIGIN = 'https://vector.buildwithoracle.com';
 
@@ -59,23 +60,33 @@ type MenuApiItem = {
   studio?: string;
 };
 
-function readCachedNav(): NavSet | null {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed.ts !== 'number') return null;
-    if (Date.now() - parsed.ts > CACHE_TTL_MS) return null;
-    return parsed.nav as NavSet;
-  } catch {
-    return null;
+function buildNavSet(items: MenuApiItem[]): NavSet {
+  const main: Array<NavItem & { order: number }> = [];
+  const tools: Array<NavItem & { order: number }> = [];
+  for (const item of items) {
+    if (!item || typeof item.path !== 'string' || typeof item.label !== 'string') continue;
+    const bucket = item.group === 'tools' ? tools : item.group === 'main' ? main : null;
+    if (!bucket) continue;
+    const entry: NavItem & { order: number } = {
+      path: item.path,
+      label: item.label,
+      order: typeof item.order === 'number' ? item.order : 999,
+    };
+    if (typeof item.studio === 'string' && item.studio) entry.studio = item.studio;
+    bucket.push(entry);
   }
-}
-
-function writeCachedNav(nav: NavSet): void {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), nav }));
-  } catch {}
+  const byOrder = (a: { order: number }, b: { order: number }) => a.order - b.order;
+  main.sort(byOrder);
+  tools.sort(byOrder);
+  const strip = ({ path, label, studio }: NavItem & { order: number }): NavItem =>
+    studio ? { path, label, studio } : { path, label };
+  const mainItems = main.map(strip);
+  return {
+    main: mainItems.some((n) => n.path === '/' && !n.studio)
+      ? mainItems
+      : [{ path: '/', label: 'Overview' }, ...mainItems],
+    tools: tools.map(strip),
+  };
 }
 
 export function Header() {
@@ -84,7 +95,7 @@ export function Header() {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [stats, setStats] = useState({ searches: 0, learnings: 0 });
   const [backendVersion, setBackendVersion] = useState<string | null>(null);
-  const [nav, setNav] = useState<NavSet>(() => readCachedNav() ?? { main: FALLBACK_NAV, tools: FALLBACK_TOOLS });
+  const [nav, setNav] = useState<NavSet>({ main: FALLBACK_NAV, tools: FALLBACK_TOOLS });
 
   useEffect(() => {
     let cancelled = false;
@@ -103,41 +114,24 @@ export function Header() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(apiUrl('/api/menu'));
-        if (!res.ok) return;
-        const data = await res.json();
+        // Cached via the shared client cache — 24h TTL, tag='menu'.
+        // MenuEditor / GistSourceConfig call `cacheBus.invalidate('menu')` on write,
+        // so edits bust this immediately instead of waiting for the old 5-min TTL.
+        const data = await cached<{ items?: MenuApiItem[] }>(
+          MENU_CACHE_KEY,
+          MENU_CACHE_TTL_MS,
+          async () => {
+            const res = await fetch(apiUrl('/api/menu'));
+            if (!res.ok) throw new Error(`menu ${res.status}`);
+            return res.json();
+          },
+          { tag: 'menu' },
+        );
         const items: MenuApiItem[] = Array.isArray(data?.items) ? data.items : [];
         if (cancelled || items.length === 0) return;
-        const main: Array<NavItem & { order: number }> = [];
-        const tools: Array<NavItem & { order: number }> = [];
-        for (const item of items) {
-          if (!item || typeof item.path !== 'string' || typeof item.label !== 'string') continue;
-          const bucket = item.group === 'tools' ? tools : item.group === 'main' ? main : null;
-          if (!bucket) continue;
-          const entry: NavItem & { order: number } = {
-            path: item.path,
-            label: item.label,
-            order: typeof item.order === 'number' ? item.order : 999,
-          };
-          if (typeof item.studio === 'string' && item.studio) entry.studio = item.studio;
-          bucket.push(entry);
-        }
-        const byOrder = (a: { order: number }, b: { order: number }) => a.order - b.order;
-        main.sort(byOrder);
-        tools.sort(byOrder);
-        const strip = ({ path, label, studio }: NavItem & { order: number }): NavItem =>
-          studio ? { path, label, studio } : { path, label };
-        const mainItems = main.map(strip);
-        const next = {
-          main: mainItems.some((n) => n.path === '/' && !n.studio)
-            ? mainItems
-            : [{ path: '/', label: 'Overview' }, ...mainItems],
-          tools: tools.map(strip),
-        };
-        setNav(next);
-        writeCachedNav(next);
+        setNav(buildNavSet(items));
       } catch {
-        // Backend unreachable — keep fallback/cached nav.
+        // Backend unreachable — keep fallback nav.
       }
     })();
     return () => { cancelled = true; };
