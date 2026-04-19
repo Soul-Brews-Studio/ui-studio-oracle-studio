@@ -279,6 +279,8 @@ export interface PluginInfo {
   file: string;
   size: number;
   modified: string;
+  version?: string;
+  description?: string;
 }
 
 export async function getPlugins(): Promise<{ plugins: PluginInfo[] }> {
