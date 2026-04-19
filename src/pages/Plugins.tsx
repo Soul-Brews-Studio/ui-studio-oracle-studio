@@ -87,14 +87,26 @@ export function Plugins() {
             >
               <div className="flex items-center gap-3 mb-1.5">
                 <span className="text-base font-mono font-bold text-white">{p.name}</span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono text-white/50 bg-white/[0.05] border border-white/[0.08]">
+                  {p.version ?? '—'}
+                </span>
                 <span className="text-[10px] font-mono text-white/30 ml-auto">{formatSize(p.size)}</span>
               </div>
+              {p.description && (
+                <div className="text-xs font-mono text-white/50 line-clamp-2 mb-1">{p.description}</div>
+              )}
               <div className="text-xs font-mono text-white/35">{p.file}</div>
             </button>
           ))}
           {!loading && plugins.length === 0 && (
-            <div className="text-white/20 font-mono text-sm col-span-2">
-              No plugins found. Place .wasm files in ~/.oracle/plugins/
+            <div className="col-span-2 text-white/40 font-mono text-sm space-y-3">
+              <div>No plugins installed yet.</div>
+              <div>Install the sample plugin:</div>
+              <pre className="px-4 py-3 rounded-lg bg-white/[0.03] border border-white/[0.08] text-xs text-white/60 overflow-x-auto whitespace-pre">
+{`bunx --bun neo-arra@github:Soul-Brews-Studio/arra-oracle-v3 \\
+  plugin install github.com/Soul-Brews-Studio/arra-wasm-hello`}
+              </pre>
+              <div>Or drop a .wasm file into ~/.oracle/plugins/</div>
             </div>
           )}
         </div>
