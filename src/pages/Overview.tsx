@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { getStats, reflect, stripProjectPrefix } from '../api/oracle';
@@ -305,14 +306,24 @@ export function Overview() {
                     )}
                   </div>
                   {wisdom.source_file && (
-                    <div className="flex items-center gap-2 text-xs">
+                    <div className="flex items-center gap-2 text-xs flex-wrap">
                       <span className="text-text-muted">Source:</span>
-                      <code
-                        className="font-mono text-[11px] text-accent px-2 py-1 rounded"
+                      <Link
+                        to={`/doc/${encodeURIComponent(wisdom.id)}`}
+                        onClick={() => setShowModal(false)}
+                        className="font-mono text-[11px] text-accent px-2 py-1 rounded transition-all duration-200 hover:bg-[rgba(167,139,250,0.2)] hover:underline cursor-pointer"
                         style={{ background: 'rgba(167, 139, 250, 0.1)' }}
-                      >{stripProjectPrefix(wisdom.source_file, wisdom.project)}</code>
+                        title="Open full document"
+                      >{stripProjectPrefix(wisdom.source_file, wisdom.project)}</Link>
                     </div>
                   )}
+                  <div className="flex justify-end">
+                    <Link
+                      to={`/doc/${encodeURIComponent(wisdom.id)}`}
+                      onClick={() => setShowModal(false)}
+                      className="text-xs text-accent hover:underline"
+                    >Open full document →</Link>
+                  </div>
                 </div>
               </div>
             </div>
