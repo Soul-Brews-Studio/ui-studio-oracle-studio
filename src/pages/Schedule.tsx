@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { SidebarLayout, TOOLS_NAV } from '../components/SidebarLayout';
-
-const API_BASE = '/api';
+import { API_BASE } from '../api/oracle';
 
 export function Schedule() {
   const [content, setContent] = useState('');

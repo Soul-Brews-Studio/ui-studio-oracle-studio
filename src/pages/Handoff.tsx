@@ -26,7 +26,7 @@ export function Handoff() {
   async function loadInbox() {
     setLoading(true);
     try {
-      const res = await fetch('/api/inbox?limit=50');
+      const res = await fetch(`${API_BASE}/inbox?limit=50`);
       if (res.ok) {
         const data = await res.json();
         setFiles(data.files || []);
