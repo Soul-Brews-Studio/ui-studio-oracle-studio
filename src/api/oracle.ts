@@ -1,13 +1,16 @@
 // Oracle API client
 //
-// API_BASE resolution:
-// 1. VITE_API_BASE env (set at build time) — explicit override
-// 2. Production build → http://localhost:47778/api (deployed studio connects
-//    to the user's local MCP via Private Network Access CORS)
-// 3. Dev → /api (vite proxy or bunx serve.ts proxy forwards to :47778)
-export const API_BASE =
-  (import.meta.env.VITE_API_BASE as string | undefined) ??
-  (import.meta.env.PROD ? 'http://localhost:47778/api' : '/api');
+// Host resolution follows the maw-ui / local.drizzle.studio pattern:
+// - ?host=localhost:47778 on load → saved to localStorage, URL redirected clean
+// - No stored host → same-origin `/api` (dev via vite proxy, or studio served by a local MCP)
+// - Stored host → prepended to every request, e.g. https://mba.wg:47778/api
+//
+// See ./host.ts for the full API (setStoredHost, clearStoredHost, getRecentHosts, wsUrl…).
+import { apiUrl } from './host';
+export { apiUrl } from './host';
+
+/** Resolved base for Oracle API (e.g. `/api` or `https://mba.wg:47778/api`). */
+export const API_BASE = apiUrl('/api');
 
 /** Strip project prefix from source_file for display (vault-indexed cross-project docs) */
 export function stripProjectPrefix(sourceFile: string, project?: string): string {
