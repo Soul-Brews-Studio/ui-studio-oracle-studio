@@ -24,6 +24,7 @@ import { Pulse } from './pages/Pulse';
 import { Plugins } from './pages/Plugins';
 import { Sessions } from './pages/Sessions';
 import { Canvas } from './pages/Canvas';
+import { Planets } from './pages/Planets';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { getStats } from './api/oracle';
 import { setVaultRepo } from './utils/docDisplay';
@@ -86,6 +87,7 @@ function AppContent() {
         <Route path="/sessions" element={<RequireAuth><Sessions /></RequireAuth>} />
         <Route path="/sessions/:id" element={<RequireAuth><Sessions /></RequireAuth>} />
         <Route path="/canvas" element={<RequireAuth><Canvas /></RequireAuth>} />
+        <Route path="/planets" element={<RequireAuth><Planets /></RequireAuth>} />
         <Route path="/plugins" element={<RequireAuth><Plugins /></RequireAuth>} />
         <Route path="/schedule" element={<RequireAuth><Schedule /></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
