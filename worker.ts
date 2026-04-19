@@ -20,18 +20,6 @@ export default {
         headers: { "cache-control": "no-store" },
       });
     }
-    const VECTOR_HOSTS = new Set([
-      "vector.buildwithoracle.com",
-      "vector-playground.buildwithoracle.com",
-    ]);
-    if (
-      VECTOR_HOSTS.has(url.hostname) &&
-      (url.pathname === "/" || url.pathname === "/index.html")
-    ) {
-      const rewritten = new URL(request.url);
-      rewritten.pathname = "/playground";
-      return env.ASSETS.fetch(new Request(rewritten.toString(), request));
-    }
     return env.ASSETS.fetch(request);
   },
 };
