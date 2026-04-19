@@ -1,91 +1,75 @@
-import { useMemo } from 'react';
-import { KnowledgeMap } from 'knowledge-map-3d';
-import type { MapDocument, ClusterMeta, NebulaMeta } from 'knowledge-map-3d';
-
-function demoData(): { documents: MapDocument[]; clusters: ClusterMeta[]; nebulae: NebulaMeta[] } {
-  const clusterPositions = [
-    { id: 'c-core', label: 'Oracle Core', cx: 0, cy: 0, cz: 0 },
-    { id: 'c-routes', label: 'Routes', cx: 14, cy: 2, cz: -4 },
-    { id: 'c-plugins', label: 'Plugins', cx: -12, cy: -3, cz: 6 },
-    { id: 'c-tests', label: 'Tests', cx: 3, cy: 12, cz: 3 },
-  ];
-
-  const docs: MapDocument[] = [];
-  const clusters: ClusterMeta[] = [];
-
-  clusterPositions.forEach((c, ci) => {
-    const n = 8 + (ci % 3);
-    for (let i = 0; i < n; i++) {
-      const angle = (i / n) * Math.PI * 2;
-      const r = 2 + (i % 3);
-      docs.push({
-        id: `${c.id}-d${i}`,
-        type: ci === 0 ? 'concept' : ci === 1 ? 'route' : ci === 2 ? 'plugin' : 'test',
-        sourceFile: `${c.label}/item-${i}.ts`,
-        concepts: [c.label.toLowerCase()],
-        project: 'arra-oracle-v3',
-        x: c.cx + Math.cos(angle) * r,
-        y: c.cy + Math.sin(angle) * r * 0.5,
-        z: c.cz + Math.sin(angle * 2) * r * 0.3,
-        clusterId: c.id,
-        orbitRadius: r,
-        orbitSpeed: 0.002 + (i % 5) * 0.0005,
-        orbitPhase: angle,
-        orbitTilt: (i % 7) * 0.1,
-        parentId: null,
-        moonCount: 0,
-        createdAt: Date.now() - i * 86_400_000,
-        contentLength: 1000 + i * 200,
-      });
-    }
-    clusters.push({
-      id: c.id,
-      label: c.label,
-      docCount: n,
-      cx: c.cx,
-      cy: c.cy,
-      cz: c.cz,
-      radius: 8,
-      concepts: [c.label.toLowerCase()],
-      starDocId: null,
-    });
-  });
-
-  const nebulae: NebulaMeta[] = [
-    {
-      id: 'n-core-routes',
-      clusterA: 'c-core',
-      clusterB: 'c-routes',
-      cx: 7,
-      cy: 1,
-      cz: -2,
-      strength: 0.6,
-      color: '#7c3aed',
-    },
-    {
-      id: 'n-core-plugins',
-      clusterA: 'c-core',
-      clusterB: 'c-plugins',
-      cx: -6,
-      cy: -1.5,
-      cz: 3,
-      strength: 0.4,
-      color: '#f59e0b',
-    },
-  ];
-
-  return { documents: docs, clusters, nebulae };
-}
+import { useCallback, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { usePlanetsData } from '../hooks/usePlanetsData';
+import { usePlanetsSearch } from '../hooks/usePlanetsSearch';
+import { PlanetsCanvas } from '../components/planets/PlanetsCanvas';
+import { PlanetsSidebar } from '../components/planets/PlanetsSidebar';
+import { PlanetsHUD } from '../components/planets/PlanetsHUD';
+import { PlanetsLoading, PlanetsEmpty } from '../components/planets/PlanetsEmpty';
+import { NebulaLegend } from '../components/planets/NebulaLegend';
+import { TYPE_COLORS } from '../lib/type-colors';
 
 export function Planets() {
-  const { documents, clusters, nebulae } = useMemo(demoData, []);
+  const navigate = useNavigate();
+  const data = usePlanetsData();
+  const search = usePlanetsSearch();
+  const [visibleTypes, setVisibleTypes] = useState<Set<string>>(() => new Set(Object.keys(TYPE_COLORS)));
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+
+  const toggleType = useCallback((t: string) => {
+    setVisibleTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(t)) next.delete(t); else next.add(t);
+      return next;
+    });
+  }, []);
+
+  const filteredDocs = useMemo(
+    () => data.documents.filter((d) =>
+      visibleTypes.has(d.type) && (!selectedProject || d.project === selectedProject)),
+    [data.documents, visibleTypes, selectedProject],
+  );
+
+  const typeCounts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const d of data.documents) c[d.type] = (c[d.type] || 0) + 1;
+    return c;
+  }, [data.documents]);
+
+  if (data.loading) return <PlanetsLoading />;
+  if (data.error) return <PlanetsEmpty message={data.error} />;
+  if (data.documents.length === 0) return <PlanetsEmpty />;
+
   return (
-    <div className="w-full h-[calc(100vh-110px)] bg-black">
-      <KnowledgeMap
-        documents={documents}
-        clusters={clusters}
-        nebulae={nebulae}
-        embedded={false}
+    <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-black">
+      <div className="flex-1 relative overflow-hidden">
+        <PlanetsCanvas
+          documents={filteredDocs}
+          clusters={data.clusters}
+          nebulae={data.nebulae}
+          highlightIds={search.matchIds}
+          onDocumentClick={(doc) => navigate(`/doc/${doc.id}`)}
+        />
+        <PlanetsHUD
+          query={search.query}
+          onQueryChange={search.setQuery}
+          onClear={search.clear}
+          matchCount={search.matchIds.size}
+          visibleTypes={visibleTypes}
+          onToggleType={toggleType}
+        />
+        <NebulaLegend />
+      </div>
+      <PlanetsSidebar
+        stats={data.stats}
+        clusters={data.clusters}
+        totalDocs={data.documents.length}
+        typeCounts={typeCounts}
+        matchCount={search.matchIds.size}
+        selectedProject={selectedProject}
+        onSelectProject={setSelectedProject}
+        model={data.model}
+        onSetModel={data.setModel}
       />
     </div>
   );
