@@ -2,9 +2,11 @@ import { Link, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE } from '../api/oracle';
-import { hostLabel, isDefault, setStoredHost, clearStoredHost } from '../api/host';
+import { apiUrl, hostLabel, isDefault, setStoredHost, clearStoredHost } from '../api/host';
 
-const navItems = [
+type NavItem = { path: string; label: string };
+
+const FALLBACK_NAV: NavItem[] = [
   { path: '/', label: 'Overview' },
   { path: '/feed', label: 'Feed' },
   { path: '/map', label: 'Memory' },
@@ -14,21 +16,147 @@ const navItems = [
   { path: '/sessions', label: 'Sessions' },
   { path: '/plugins', label: 'Plugins' },
   { path: '/activity?tab=searches', label: 'Activity' },
-] as const;
+];
 
-const toolsItems = [
+const FALLBACK_TOOLS: NavItem[] = [
   { path: '/playground', label: 'Playground' },
   { path: '/compare', label: 'Compare' },
   { path: '/evolution', label: 'Evolution' },
   { path: '/traces', label: 'Traces' },
   { path: '/schedule', label: 'Schedule' },
-] as const;
+];
+
+// API path → studio route. Longer keys are matched first (so /api/supersede
+// matches before any bare prefix). Unmapped tagged paths are skipped.
+const API_TO_STUDIO: Array<[string, string]> = [
+  ['/api/supersede', '/superseded'],
+  ['/api/search', '/search'],
+  ['/api/list', '/feed'],
+  ['/api/reflect', '/playground'],
+  ['/api/threads', '/forum'],
+  ['/api/traces', '/traces'],
+  ['/api/schedule', '/schedule'],
+  ['/api/plugins', '/plugins'],
+  ['/api/graph', '/map'],
+  ['/api/map3d', '/map'],
+  ['/api/map', '/map'],
+  ['/api/context', '/evolution'],
+  ['/api/stats', '/pulse'],
+];
+
+const CACHE_KEY = 'oracle_studio_swagger_nav_v1';
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+type NavSet = { main: NavItem[]; tools: NavItem[] };
+
+function studioPathFor(apiPath: string): string | null {
+  for (const [prefix, studio] of API_TO_STUDIO) {
+    if (apiPath === prefix || apiPath.startsWith(prefix + '/')) return studio;
+  }
+  return null;
+}
+
+function parseSwaggerNav(spec: any): NavSet | null {
+  const main: Array<NavItem & { order: number }> = [];
+  const tools: Array<NavItem & { order: number }> = [];
+  const seen = new Set<string>();
+  const paths = spec?.paths ?? {};
+  for (const [apiPath, methods] of Object.entries(paths)) {
+    if (!methods || typeof methods !== 'object') continue;
+    for (const op of Object.values(methods as Record<string, any>)) {
+      const tags: string[] = Array.isArray(op?.tags) ? op.tags : [];
+      const group: 'main' | 'tools' | null = tags.includes('nav:main')
+        ? 'main'
+        : tags.includes('nav:tools')
+        ? 'tools'
+        : null;
+      if (!group) continue;
+      const studio = studioPathFor(apiPath);
+      if (!studio) continue;
+      const key = `${group}:${studio}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const orderTag = tags.find((t) => t.startsWith('order:'));
+      const order = orderTag ? parseInt(orderTag.slice('order:'.length), 10) : 999;
+      const label: string = typeof op?.summary === 'string' && op.summary ? op.summary : studio.replace('/', '') || 'Home';
+      (group === 'main' ? main : tools).push({ path: studio, label, order });
+    }
+  }
+  if (main.length === 0 && tools.length === 0) return null;
+  const byOrder = (a: { order: number }, b: { order: number }) => a.order - b.order;
+  main.sort(byOrder);
+  tools.sort(byOrder);
+  return {
+    main: main.map(({ path, label }) => ({ path, label })),
+    tools: tools.map(({ path, label }) => ({ path, label })),
+  };
+}
+
+function readCachedNav(): NavSet | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.ts !== 'number') return null;
+    if (Date.now() - parsed.ts > CACHE_TTL_MS) return null;
+    return parsed.nav as NavSet;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedNav(nav: NavSet): void {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), nav }));
+  } catch {}
+}
 
 export function Header() {
   const location = useLocation();
   const { isAuthenticated, authEnabled, logout } = useAuth();
   const [toolsOpen, setToolsOpen] = useState(false);
   const [stats, setStats] = useState({ searches: 0, learnings: 0 });
+  const [backendVersion, setBackendVersion] = useState<string | null>(null);
+  const [nav, setNav] = useState<NavSet>(() => readCachedNav() ?? { main: FALLBACK_NAV, tools: FALLBACK_TOOLS });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(apiUrl('/api/health'));
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (!cancelled && typeof data.version === 'string') setBackendVersion(data.version);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(apiUrl('/swagger/json'));
+        if (!res.ok) return;
+        const spec = await res.json();
+        const parsed = parseSwaggerNav(spec);
+        if (!parsed || cancelled) return;
+        // Overview (`/`) isn't in swagger; keep it pinned at the front of main.
+        const main = parsed.main.some((n) => n.path === '/')
+          ? parsed.main
+          : [{ path: '/', label: 'Overview' }, ...parsed.main];
+        const next = { main, tools: parsed.tools };
+        setNav(next);
+        writeCachedNav(next);
+      } catch {
+        // Backend unreachable — keep fallback/cached nav.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const navItems = nav.main;
+  const toolsItems = nav.tools;
   const [sessionStart] = useState(() => {
     const stored = localStorage.getItem('oracle_session_start');
     if (stored) return parseInt(stored);
@@ -64,8 +192,13 @@ export function Header() {
       <div className="flex justify-between items-center px-4 py-2">
         <Link to="/" className="text-lg font-bold text-accent shrink-0">
           ARRA 🔮racle
-          <span className="text-[10px] font-medium text-text-muted bg-bg-card px-1.5 py-0.5 rounded ml-2 align-middle">
+          <span
+            className="text-[10px] font-medium text-text-muted bg-bg-card px-1.5 py-0.5 rounded ml-2 align-middle"
+            title={backendVersion ? `ui ${__APP_VERSION__} · api ${backendVersion}` : `ui ${__APP_VERSION__}`}
+          >
             {__APP_VERSION__}
+            {backendVersion && <span className="text-text-muted/60"> · </span>}
+            {backendVersion && <span className="text-accent/80">{backendVersion}</span>}
           </span>
         </Link>
 
