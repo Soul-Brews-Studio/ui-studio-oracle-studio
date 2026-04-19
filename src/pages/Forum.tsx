@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Spinner } from '../components/ui/Spinner';
+import { API_BASE } from '../api/oracle';
 
 interface Thread {
   id: number;
@@ -25,8 +26,6 @@ interface ThreadDetail {
   thread: { id: number; title: string; status: string; created_at: string; issue_url: string | null };
   messages: Message[];
 }
-
-const API_BASE = '/api';
 
 const STATUS_COLORS: Record<string, string> = {
   answered: '#4ade80',
