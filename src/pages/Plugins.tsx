@@ -103,7 +103,7 @@ export function Plugins() {
               <div>No plugins installed yet.</div>
               <div>Install the sample plugin:</div>
               <pre className="px-4 py-3 rounded-lg bg-white/[0.03] border border-white/[0.08] text-xs text-white/60 overflow-x-auto whitespace-pre">
-{`bunx --bun neo-arra@github:Soul-Brews-Studio/arra-oracle-v3 \\
+{`bunx --bun arra-cli@github:Soul-Brews-Studio/arra-oracle-v3 \\
   plugin install github.com/Soul-Brews-Studio/arra-wasm-hello`}
               </pre>
               <div>Or drop a .wasm file into ~/.oracle/plugins/</div>
