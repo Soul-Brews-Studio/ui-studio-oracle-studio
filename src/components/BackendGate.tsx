@@ -67,7 +67,7 @@ function UnreachableLanding({ onRetry }: { onRetry: () => void }) {
     <div className="min-h-screen flex items-center justify-center p-6">
       <div className="bg-bg-card border border-border rounded-2xl p-10 max-w-[720px] w-full">
         <h1 className="text-3xl font-semibold text-text-primary mb-3">
-          ARRA 🔮racle needs a local MCP
+          ARRA 🔮Racle needs a local MCP
         </h1>
         <p className="text-text-secondary mb-2">
           This studio is a thin client. Run the backend locally first:
