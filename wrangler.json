@@ -12,6 +12,10 @@
     {
       "pattern": "vector-playground.buildwithoracle.com",
       "custom_domain": true
+    },
+    {
+      "pattern": "vector.buildwithoracle.com",
+      "custom_domain": true
     }
   ],
   "assets": {

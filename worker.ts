@@ -20,8 +20,12 @@ export default {
         headers: { "cache-control": "no-store" },
       });
     }
+    const VECTOR_HOSTS = new Set([
+      "vector.buildwithoracle.com",
+      "vector-playground.buildwithoracle.com",
+    ]);
     if (
-      url.hostname === "vector-playground.buildwithoracle.com" &&
+      VECTOR_HOSTS.has(url.hostname) &&
       (url.pathname === "/" || url.pathname === "/index.html")
     ) {
       const rewritten = new URL(request.url);
