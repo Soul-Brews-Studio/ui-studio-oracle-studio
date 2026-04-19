@@ -6,6 +6,7 @@
       "name": "oracle-studio",
       "dependencies": {
         "@types/three": "^0.182.0",
+        "knowledge-map-3d": "github:Bombbaza/Multi-Planet-System-Knowledge-Map-3D",
         "ml5": "1",
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
@@ -737,6 +738,8 @@
     "keyv": ["keyv@4.5.4", "", { "dependencies": { "json-buffer": "3.0.1" } }, "sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw=="],
 
     "kind-of": ["kind-of@6.0.3", "", {}, "sha512-dcS1ul+9tmeD95T+x28/ehLgd9mENa3LsvDTtzm3vyBEO7RPptvAD+t44WVXaUjTBRcrpFeFlC8WCruUR456hw=="],
+
+    "knowledge-map-3d": ["knowledge-map-3d@github:Bombbaza/Multi-Planet-System-Knowledge-Map-3D#4dfd12d", { "peerDependencies": { "react": ">=18", "react-dom": ">=18", "three": ">=0.150.0" } }, "Bombbaza-Multi-Planet-System-Knowledge-Map-3D-4dfd12d", "sha512-ddXFX0qW9mEd+3JaixN8wwGwsvaFKz0foCXz+ioPQug+s84lSfZGYdJUfyB+rSnpCcnf275WQhBOSR9JYxUIlg=="],
 
     "levn": ["levn@0.4.1", "", { "dependencies": { "prelude-ls": "^1.2.1", "type-check": "~0.4.0" } }, "sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ=="],
 

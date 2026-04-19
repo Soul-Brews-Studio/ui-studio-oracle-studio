@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "@types/three": "^0.182.0",
+    "knowledge-map-3d": "github:Bombbaza/Multi-Planet-System-Knowledge-Map-3D",
     "ml5": "1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
