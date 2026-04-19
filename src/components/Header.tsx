@@ -115,7 +115,21 @@ export function Header() {
   const { isAuthenticated, authEnabled, logout } = useAuth();
   const [toolsOpen, setToolsOpen] = useState(false);
   const [stats, setStats] = useState({ searches: 0, learnings: 0 });
+  const [backendVersion, setBackendVersion] = useState<string | null>(null);
   const [nav, setNav] = useState<NavSet>(() => readCachedNav() ?? { main: FALLBACK_NAV, tools: FALLBACK_TOOLS });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(apiUrl('/api/health'));
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (!cancelled && typeof data.version === 'string') setBackendVersion(data.version);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -177,8 +191,13 @@ export function Header() {
       <div className="flex justify-between items-center px-4 py-2">
         <Link to="/" className="text-lg font-bold text-accent shrink-0">
           ARRA 🔮racle
-          <span className="text-[10px] font-medium text-text-muted bg-bg-card px-1.5 py-0.5 rounded ml-2 align-middle">
+          <span
+            className="text-[10px] font-medium text-text-muted bg-bg-card px-1.5 py-0.5 rounded ml-2 align-middle"
+            title={backendVersion ? `ui ${__APP_VERSION__} · api ${backendVersion}` : `ui ${__APP_VERSION__}`}
+          >
             {__APP_VERSION__}
+            {backendVersion && <span className="text-text-muted/60"> · </span>}
+            {backendVersion && <span className="text-accent/80">{backendVersion}</span>}
           </span>
         </Link>
 
