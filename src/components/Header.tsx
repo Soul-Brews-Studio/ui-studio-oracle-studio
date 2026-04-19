@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { API_BASE } from '../api/oracle';
 
 const navItems = [
   { path: '/', label: 'Overview' },
@@ -42,7 +43,7 @@ export function Header() {
 
   async function loadStats() {
     try {
-      const res = await fetch(`/api/session/stats?since=${sessionStart}`);
+      const res = await fetch(`${API_BASE}/session/stats?since=${sessionStart}`);
       if (res.ok) {
         const data = await res.json();
         setStats({ searches: data.searches, learnings: data.learnings });

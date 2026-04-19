@@ -2,7 +2,7 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { list, getFile, getDoc } from '../api/oracle';
+import { list, getFile, getDoc, API_BASE } from '../api/oracle';
 import type { Document } from '../api/oracle';
 import { SidebarLayout } from '../components/SidebarLayout';
 import { getDocDisplayInfo } from '../utils/docDisplay';
@@ -154,7 +154,7 @@ export function DocDetail() {
     if (!doc?.source_file) return;
 
     try {
-      const res = await fetch(`/api/file?path=${encodeURIComponent(doc.source_file)}${doc.project ? `&project=${encodeURIComponent(doc.project)}` : ''}`);
+      const res = await fetch(`${API_BASE}/file?path=${encodeURIComponent(doc.source_file)}${doc.project ? `&project=${encodeURIComponent(doc.project)}` : ''}`);
       if (res.ok) {
         const content = await res.text();
         setRawContent(content);

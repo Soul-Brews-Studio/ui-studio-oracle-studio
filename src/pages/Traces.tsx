@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { SidebarLayout, TOOLS_NAV } from '../components/SidebarLayout';
 import { getDocDisplayInfo } from '../utils/docDisplay';
 import { Spinner } from '../components/ui/Spinner';
+import { API_BASE } from '../api/oracle';
 
 interface TraceSummary {
   traceId: string;
@@ -107,7 +108,7 @@ export function Traces() {
     try {
       const params = new URLSearchParams({ limit: '100' });
       if (statusFilter !== 'all') params.set('status', statusFilter);
-      const res = await fetch(`/api/traces?${params}`);
+      const res = await fetch(`${API_BASE}/traces?${params}`);
       const data: TracesResponse = await res.json();
       setTraces(data.traces);
       setTotal(data.total);
@@ -121,7 +122,7 @@ export function Traces() {
   async function loadTraceDetail(traceId: string) {
     setLoading(true);
     try {
-      const res = await fetch(`/api/traces/${traceId}`);
+      const res = await fetch(`${API_BASE}/traces/${traceId}`);
       if (!res.ok) {
         navigate('/traces');
         return;
@@ -138,7 +139,7 @@ export function Traces() {
 
   async function loadLinkedChain(traceId: string) {
     try {
-      const res = await fetch(`/api/traces/${traceId}/linked-chain`);
+      const res = await fetch(`${API_BASE}/traces/${traceId}/linked-chain`);
       if (res.ok) {
         const data = await res.json();
         setLinkedChain(data.chain || []);
@@ -153,7 +154,7 @@ export function Traces() {
   async function loadFamilyChain(traceId: string) {
     try {
       // Fetch current trace to get parent/children info
-      const res = await fetch(`/api/traces/${traceId}`);
+      const res = await fetch(`${API_BASE}/traces/${traceId}`);
       if (!res.ok) return;
       const current: TraceDetail = await res.json();
 
@@ -161,7 +162,7 @@ export function Traces() {
 
       // Fetch parent if exists
       if (current.parentTraceId) {
-        const parentRes = await fetch(`/api/traces/${current.parentTraceId}`);
+        const parentRes = await fetch(`${API_BASE}/traces/${current.parentTraceId}`);
         if (parentRes.ok) {
           const parent: TraceDetail = await parentRes.json();
           family.push(parent);
@@ -174,7 +175,7 @@ export function Traces() {
       // Fetch children
       if (current.childTraceIds && current.childTraceIds.length > 0) {
         for (const childId of current.childTraceIds) {
-          const childRes = await fetch(`/api/traces/${childId}`);
+          const childRes = await fetch(`${API_BASE}/traces/${childId}`);
           if (childRes.ok) {
             const child: TraceDetail = await childRes.json();
             family.push(child);
@@ -184,13 +185,13 @@ export function Traces() {
 
       // Also check if current is a child and has siblings
       if (current.parentTraceId) {
-        const parentRes = await fetch(`/api/traces/${current.parentTraceId}`);
+        const parentRes = await fetch(`${API_BASE}/traces/${current.parentTraceId}`);
         if (parentRes.ok) {
           const parent: TraceDetail = await parentRes.json();
           // Add siblings (other children of parent)
           for (const siblingId of parent.childTraceIds || []) {
             if (siblingId !== traceId && !family.some(f => f.traceId === siblingId)) {
-              const sibRes = await fetch(`/api/traces/${siblingId}`);
+              const sibRes = await fetch(`${API_BASE}/traces/${siblingId}`);
               if (sibRes.ok) {
                 const sibling: TraceDetail = await sibRes.json();
                 family.push(sibling);
@@ -246,7 +247,7 @@ export function Traces() {
       // First try direct file read
       const params = new URLSearchParams({ path });
       if (project) params.set('project', project);
-      const res = await fetch(`/api/file?${params}`);
+      const res = await fetch(`${API_BASE}/file?${params}`);
       if (res.ok) {
         const text = await res.text();
         if (text && !text.startsWith('File not found')) {
@@ -257,7 +258,7 @@ export function Traces() {
 
       // Search Oracle for related content (use last part of path or repo name)
       const searchTerm = path.split('/').pop()?.replace('.md', '') || path.split('/').slice(-1)[0] || '';
-      const searchRes = await fetch(`/api/search?q=${encodeURIComponent(searchTerm)}&limit=1`);
+      const searchRes = await fetch(`${API_BASE}/search?q=${encodeURIComponent(searchTerm)}&limit=1`);
       if (searchRes.ok) {
         const searchData = await searchRes.json();
         if (searchData.results?.[0]) {
@@ -274,7 +275,7 @@ export function Traces() {
       // Also try searching for the full path/repo name
       if (!fileConcepts.length) {
         const repoName = path.replace(/\//g, ' ');
-        const repoSearchRes = await fetch(`/api/search?q=${encodeURIComponent(repoName)}&limit=1`);
+        const repoSearchRes = await fetch(`${API_BASE}/search?q=${encodeURIComponent(repoName)}&limit=1`);
         if (repoSearchRes.ok) {
           const repoData = await repoSearchRes.json();
           if (repoData.results?.[0]?.concepts) {
