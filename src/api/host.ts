@@ -18,6 +18,7 @@
 const STORAGE_KEY = 'oracle-studio-host';
 const RECENT_KEY = 'oracle-studio-host-recent';
 const RECENT_LIMIT = 8;
+const DEFAULT_HOST = 'http://localhost:47778';
 
 const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
 const urlHost = params.get('host');
@@ -31,10 +32,14 @@ if (urlHost && typeof window !== 'undefined') {
   window.location.replace(url.toString());
 }
 
-const hostParam = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+// Resolution: stored host > DEFAULT_HOST (localhost:47778).
+// Always resolves to *some* host; users can override via ?host= in the URL.
+const storedHost = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+const hostParam = storedHost ?? DEFAULT_HOST;
 
-export const isRemote = !!hostParam;
-export const activeHost: string | null = hostParam;
+export const isRemote = !!storedHost;
+export const isDefault = !storedHost;
+export const activeHost: string = hostParam;
 
 export function getStoredHost(): string | null {
   return typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
@@ -63,8 +68,7 @@ function addRecentHost(host: string): void {
   localStorage.setItem(RECENT_KEY, JSON.stringify(recent.slice(0, RECENT_LIMIT)));
 }
 
-function resolveHost(): { httpProto: string; wsProto: string; host: string } | null {
-  if (!hostParam) return null;
+function resolveHost(): { httpProto: string; wsProto: string; host: string } {
   if (hostParam.startsWith('https://')) {
     return {
       httpProto: 'https:',
@@ -87,17 +91,18 @@ function resolveHost(): { httpProto: string; wsProto: string; host: string } | n
 /** Build a full URL for fetch(). Accepts an `/api/...` path and prepends the configured host. */
 export function apiUrl(path: string): string {
   const r = resolveHost();
-  if (!r) return path;
   return `${r.httpProto}//${r.host}${path}`;
 }
 
 /** WebSocket URL builder. */
 export function wsUrl(path: string): string {
   const r = resolveHost();
-  if (!r) {
-    const proto = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = typeof window !== 'undefined' ? window.location.host : 'localhost';
-    return `${proto}//${host}${path}`;
-  }
   return `${r.wsProto}//${r.host}${path}`;
+}
+
+/** Human-readable host label for UI (`localhost:47778 (default)` or `mba.wg:47778`). */
+export function hostLabel(): string {
+  const r = resolveHost();
+  const withoutProto = `${r.host}`;
+  return isDefault ? `${withoutProto} (default)` : withoutProto;
 }

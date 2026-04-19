@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE } from '../api/oracle';
+import { hostLabel, isDefault, setStoredHost, clearStoredHost } from '../api/host';
 
 const navItems = [
   { path: '/', label: 'Overview' },
@@ -69,6 +70,27 @@ export function Header() {
 
         {/* Session stats - moved here */}
         <div className="flex items-center gap-3 text-xs text-text-muted font-mono shrink-0">
+          <button
+            onClick={() => {
+              const next = window.prompt(
+                'Oracle host (leave empty to use default localhost:47778):\n\nExamples:\n  localhost:47778\n  http://mba.wg:47778\n  https://oracle.example.com',
+                isDefault ? '' : hostLabel().replace(' (default)', '')
+              );
+              if (next === null) return;
+              if (next.trim() === '') clearStoredHost();
+              else setStoredHost(next.trim());
+              window.location.reload();
+            }}
+            title={`Click to change host. Currently: ${hostLabel()}`}
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border transition-all duration-150 ${
+              isDefault
+                ? 'border-border text-text-muted hover:bg-bg-card'
+                : 'border-accent/40 bg-accent/10 text-accent hover:bg-accent/20'
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${isDefault ? 'bg-text-muted' : 'bg-accent animate-pulse'}`} />
+            <span>{hostLabel()}</span>
+          </button>
           <span>{duration}</span>
           <span>{stats.searches}s</span>
           <span>{stats.learnings}l</span>
