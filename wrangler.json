@@ -8,6 +8,10 @@
     {
       "pattern": "studio.buildwithoracle.com",
       "custom_domain": true
+    },
+    {
+      "pattern": "local.buildwithoracle.com",
+      "custom_domain": true
     }
   ],
   "assets": {
