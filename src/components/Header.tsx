@@ -11,6 +11,7 @@ const navItems = [
   { path: '/search', label: 'Search' },
   { path: '/forum', label: 'Forum' },
   { path: '/pulse', label: 'Pulse' },
+  { path: '/sessions', label: 'Sessions' },
   { path: '/plugins', label: 'Plugins' },
   { path: '/activity?tab=searches', label: 'Activity' },
 ] as const;
