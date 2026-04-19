@@ -93,7 +93,7 @@ export function Forum() {
   }
 
   return (
-    <div className="flex max-w-[1200px] mx-auto p-6 gap-6 max-md:flex-col max-md:p-3 max-md:gap-0">
+    <div className="flex max-w-[1300px] mx-auto py-6 px-6 gap-6 max-md:flex-col max-md:p-3 max-md:gap-0">
       {/* Sidebar — hidden on mobile when thread is selected */}
       <div className={`w-[180px] shrink-0 flex flex-col max-md:w-full ${selected ? 'max-md:hidden' : ''}`}>
         <div className="flex justify-between items-center mb-3">
@@ -163,14 +163,14 @@ export function Forum() {
         {selected && (
           <>
             {/* Thread header */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-border flex-wrap">
+            <div className="flex items-center gap-3 px-6 py-5 mb-2 border-b border-border flex-wrap">
               <button
                 onClick={() => { setSelected(null); setSearchParams({}); }}
                 className="md:hidden bg-transparent border-none text-text-muted cursor-pointer p-1 hover:text-accent transition-colors"
               >
                 ←
               </button>
-              <h2 className="text-base font-semibold text-text-primary flex-1 min-w-0">{selected.thread.title}</h2>
+              <h2 className="text-lg font-semibold text-text-primary flex-1 min-w-0 leading-tight">{selected.thread.title}</h2>
               <StatusBadge status={selected.thread.status} />
               <button
                 onClick={handleToggle}
@@ -181,14 +181,14 @@ export function Forum() {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
               {selected.messages.map(m => (
                 <MessageCard key={m.id} message={m} />
               ))}
             </div>
 
             {/* Reply */}
-            <form onSubmit={handleSend} className="px-6 py-4 border-t border-border bg-bg-card flex gap-3">
+            <form onSubmit={handleSend} className="px-6 py-5 border-t border-border bg-bg-card flex gap-3">
               <textarea
                 placeholder="Continue the discussion..."
                 value={msg}
@@ -234,14 +234,14 @@ function MessageCard({ message: m }: { message: Message }) {
   const roleBorder = m.role === 'oracle' ? 'border-accent/30' : m.role === 'claude' ? 'border-type-learning/30' : 'border-border';
 
   return (
-    <div className={`p-4 rounded-xl bg-bg-card border ${roleBorder}`}>
-      <div className="flex justify-between items-center mb-3">
+    <div className={`p-5 rounded-2xl bg-bg-card border ${roleBorder}`}>
+      <div className="flex justify-between items-center mb-4">
         <span className="text-sm font-semibold text-text-primary">{roleLabel}</span>
         <span className="text-xs text-text-muted font-mono">{new Date(m.created_at).toLocaleString()}</span>
       </div>
-      <div className="text-text-primary leading-relaxed whitespace-pre-wrap text-[15px]">{m.content}</div>
+      <div className="text-text-primary leading-[1.65] whitespace-pre-wrap text-[15px]">{m.content}</div>
       {m.patterns_found != null && m.patterns_found > 0 && (
-        <div className="mt-3 text-xs text-accent font-mono">Found {m.patterns_found} patterns</div>
+        <div className="mt-4 text-xs text-accent font-mono">Found {m.patterns_found} patterns</div>
       )}
     </div>
   );
