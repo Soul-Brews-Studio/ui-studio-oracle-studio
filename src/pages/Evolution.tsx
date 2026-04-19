@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { SidebarLayout, TOOLS_NAV } from '../components/SidebarLayout';
+import { API_BASE } from '../api/oracle';
 
 const EVOLUTION_FILTERS = [
   { key: 'all', label: 'All' },
@@ -44,7 +45,7 @@ export function Evolution() {
   async function loadSupersessions() {
     setLoading(true);
     try {
-      const res = await fetch('/api/supersede');
+      const res = await fetch(`${API_BASE}/supersede`);
       const data: SupersedeResponse = await res.json();
       setSupersessions(data.supersessions);
       setTotal(data.total);

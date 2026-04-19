@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { SidebarLayout, TOOLS_NAV } from '../components/SidebarLayout';
 import { getDocDisplayInfo } from '../utils/docDisplay';
+import { API_BASE } from '../api/oracle';
 
 const TYPE_FILTERS = [
   { key: 'all', label: 'All' },
@@ -47,7 +48,7 @@ export function Superseded() {
   async function loadLogs() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/supersede?limit=${limit}&offset=${page * limit}`);
+      const res = await fetch(`${API_BASE}/supersede?limit=${limit}&offset=${page * limit}`);
       const data: SupersedeResponse = await res.json();
       setLogs(data.supersessions || []);
       setTotal(data.total || 0);

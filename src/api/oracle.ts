@@ -5,7 +5,7 @@
 // 2. Production build → http://localhost:47778/api (deployed studio connects
 //    to the user's local MCP via Private Network Access CORS)
 // 3. Dev → /api (vite proxy or bunx serve.ts proxy forwards to :47778)
-const API_BASE =
+export const API_BASE =
   (import.meta.env.VITE_API_BASE as string | undefined) ??
   (import.meta.env.PROD ? 'http://localhost:47778/api' : '/api');
 

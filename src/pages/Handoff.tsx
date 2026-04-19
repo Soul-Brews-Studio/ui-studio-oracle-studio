@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Markdown from 'react-markdown';
 import { SidebarLayout, TOOLS_NAV } from '../components/SidebarLayout';
+import { API_BASE } from '../api/oracle';
 
 interface HandoffFile {
   filename: string;
@@ -50,7 +51,7 @@ export function Handoff() {
     setLoadingContent(true);
 
     try {
-      const res = await fetch(`/api/file?path=${encodeURIComponent(file.path)}`);
+      const res = await fetch(`${API_BASE}/file?path=${encodeURIComponent(file.path)}`);
       if (res.ok) {
         const text = await res.text();
         setFullContent(text);
