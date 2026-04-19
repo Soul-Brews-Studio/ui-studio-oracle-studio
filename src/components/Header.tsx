@@ -29,6 +29,21 @@ const FALLBACK_TOOLS: NavItem[] = [
 const CACHE_KEY = 'oracle_studio_menu_v1';
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
+const VECTOR_ORIGIN = 'https://vector.buildwithoracle.com';
+
+/** True when the current page is served from the studio bundle's prod hosts (studio.* or local.*). */
+export function isStudioHost(): boolean {
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hostname;
+  return h.startsWith('studio.') || h.startsWith('local.');
+}
+
+/** Paths that should jump cross-origin to vector.* from the studio bundle. */
+function isVectorPath(path: string): boolean {
+  const clean = path.split('?')[0];
+  return clean === '/playground' || clean.startsWith('/playground/');
+}
+
 type NavSet = { main: NavItem[]; tools: NavItem[] };
 
 type MenuApiItem = {
@@ -156,8 +171,14 @@ export function Header() {
 
   const currentHost = hostLabel().replace(' (default)', '');
 
-  function studioHref(item: NavItem): string {
-    return `https://${item.studio}${item.path}?host=${encodeURIComponent(currentHost)}`;
+  function crossOriginHref(item: NavItem): string | null {
+    if (item.studio) {
+      return `https://${item.studio}${item.path}?host=${encodeURIComponent(currentHost)}`;
+    }
+    if (isStudioHost() && isVectorPath(item.path)) {
+      return `${VECTOR_ORIGIN}${item.path}?host=${encodeURIComponent(currentHost)}`;
+    }
+    return null;
   }
 
   return (
@@ -223,16 +244,20 @@ export function Header() {
 
       {/* Nav row: full width, scrollable */}
       <nav className="flex items-center gap-0.5 px-4 pb-2 flex-wrap">
-        {navItems.map(item => (
-          item.studio ? (
-            <a
-              key={`${item.studio}${item.path}`}
-              href={studioHref(item)}
-              className="px-2.5 py-1.5 rounded-lg text-[13px] whitespace-nowrap transition-all duration-150 text-text-secondary hover:bg-bg-card hover:text-accent border border-transparent"
-            >
-              {item.label}
-            </a>
-          ) : (
+        {navItems.map(item => {
+          const href = crossOriginHref(item);
+          if (href) {
+            return (
+              <a
+                key={href}
+                href={href}
+                className="px-2.5 py-1.5 rounded-lg text-[13px] whitespace-nowrap transition-all duration-150 text-text-secondary hover:bg-bg-card hover:text-accent border border-transparent"
+              >
+                {item.label}
+              </a>
+            );
+          }
+          return (
             <Link
               key={item.path}
               to={item.path}
@@ -244,8 +269,8 @@ export function Header() {
             >
               {item.label}
             </Link>
-          )
-        ))}
+          );
+        })}
 
         <span className="w-px h-4 bg-border mx-2" />
 
@@ -270,17 +295,21 @@ export function Header() {
               {/* Bridge gap */}
               <div className="absolute top-full left-0 right-0 h-2" />
               <div className="absolute top-[calc(100%+4px)] right-0 bg-bg-card border border-border rounded-xl p-1 min-w-[140px] shadow-lg z-[200]">
-                {toolsItems.map(item => (
-                  item.studio ? (
-                    <a
-                      key={`${item.studio}${item.path}`}
-                      href={studioHref(item)}
-                      className="block px-3 py-2 rounded-lg text-[13px] whitespace-nowrap transition-all duration-150 text-text-secondary hover:bg-white/5 hover:text-accent"
-                      onClick={() => setToolsOpen(false)}
-                    >
-                      {item.label}
-                    </a>
-                  ) : (
+                {toolsItems.map(item => {
+                  const href = crossOriginHref(item);
+                  if (href) {
+                    return (
+                      <a
+                        key={href}
+                        href={href}
+                        className="block px-3 py-2 rounded-lg text-[13px] whitespace-nowrap transition-all duration-150 text-text-secondary hover:bg-white/5 hover:text-accent"
+                        onClick={() => setToolsOpen(false)}
+                      >
+                        {item.label}
+                      </a>
+                    );
+                  }
+                  return (
                     <Link
                       key={item.path}
                       to={item.path}
@@ -293,8 +322,8 @@ export function Header() {
                     >
                       {item.label}
                     </Link>
-                  )
-                ))}
+                  );
+                })}
               </div>
             </>
           )}
