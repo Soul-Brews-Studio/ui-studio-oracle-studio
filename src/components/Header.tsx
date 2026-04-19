@@ -165,7 +165,7 @@ export function Header() {
       {/* Top row: logo + stats */}
       <div className="flex justify-between items-center px-4 py-2">
         <Link to="/" className="text-lg font-bold text-accent shrink-0">
-          ARRA 🔮racle
+          ARRA 🔮Racle
           <span
             className="text-[10px] font-medium text-text-muted bg-bg-card px-1.5 py-0.5 rounded ml-2 align-middle"
             title={backendVersion ? `ui ${__APP_VERSION__} · api ${backendVersion}` : `ui ${__APP_VERSION__}`}
