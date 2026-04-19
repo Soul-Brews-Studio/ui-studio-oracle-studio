@@ -1,6 +1,13 @@
 // Oracle API client
-// Always use /api prefix (backend routes are under /api/*)
-const API_BASE = '/api';
+//
+// API_BASE resolution:
+// 1. VITE_API_BASE env (set at build time) — explicit override
+// 2. Production build → http://localhost:47778/api (deployed studio connects
+//    to the user's local MCP via Private Network Access CORS)
+// 3. Dev → /api (vite proxy or bunx serve.ts proxy forwards to :47778)
+const API_BASE =
+  (import.meta.env.VITE_API_BASE as string | undefined) ??
+  (import.meta.env.PROD ? 'http://localhost:47778/api' : '/api');
 
 /** Strip project prefix from source_file for display (vault-indexed cross-project docs) */
 export function stripProjectPrefix(sourceFile: string, project?: string): string {
