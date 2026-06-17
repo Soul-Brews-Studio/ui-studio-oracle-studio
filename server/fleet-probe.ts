@@ -54,23 +54,34 @@ function taskText(title: string, glyph: string): string {
 
 /** Team names backed by ~/.claude/teams/<name>/config.json (with descriptions). */
 interface TeamMeta { description: string; createdByPane?: string }
+interface PaneRole { role: string; team: string }
 
-function knownTeams(): Map<string, TeamMeta> {
-  const m = new Map<string, TeamMeta>();
+/**
+ * Read team configs → (a) per-team meta, (b) a pane→role map from each member's
+ * `tmuxPaneId`. The pane map is the authoritative role signal: maw can split many
+ * agents into ONE window (orchestrator + spawned workers), so the window-name
+ * prefix mislabels them all as the lead — the member's recorded pane fixes that.
+ */
+function readTeams(): { meta: Map<string, TeamMeta>; paneRole: Map<string, PaneRole> } {
+  const meta = new Map<string, TeamMeta>();
+  const paneRole = new Map<string, PaneRole>();
   try {
     for (const dir of readdirSync(TEAMS_DIR)) {
       const cfg = join(TEAMS_DIR, dir, 'config.json');
       if (!existsSync(cfg)) continue;
       try {
         const j = JSON.parse(readFileSync(cfg, 'utf8'));
-        m.set(dir, {
+        meta.set(dir, {
           description: typeof j?.description === 'string' ? j.description : '',
           createdByPane: typeof j?.createdByPane === 'string' && j.createdByPane ? j.createdByPane : undefined,
         });
+        for (const m of (j?.members ?? []) as Array<{ name?: string; tmuxPaneId?: string }>) {
+          if (m?.tmuxPaneId && m?.name) paneRole.set(m.tmuxPaneId, { role: m.name, team: dir });
+        }
       } catch { /* skip malformed */ }
     }
   } catch { /* no teams dir */ }
-  return m;
+  return { meta, paneRole };
 }
 
 const norm = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -81,19 +92,26 @@ function readPanes(): string[][] {
 }
 
 export async function getFleetState(): Promise<FleetState> {
-  const known = knownTeams();
+  const { meta: known, paneRole } = readTeams();
   const rows = readPanes();
 
   // First pass → agents (team assignment needs slug frequencies, computed below).
   const slugCount = new Map<string, number>();
   const draft = rows.map(([session, winpane, windowName, title, cmd, paneId, cwd]) => {
-    const { role, label } = parseWindow(windowName || '');
+    // Prefer the maw team's per-pane role over the window-name prefix (handles
+    // multiple agents split into one window — see readTeams). canonicalize via
+    // parseWindow so e.g. "next-dev-1" maps to the next-dev costume.
+    const mapped = paneRole.get(paneId || '');
+    const win = parseWindow(windowName || '');
+    const role = mapped ? parseWindow(mapped.role).role : win.role;
+    const label = mapped ? mapped.team : win.label;
     const glyph = firstRune(title || '');
-    if (label && label !== 'oracle') slugCount.set(label, (slugCount.get(label) ?? 0) + 1);
+    if (!mapped && label && label !== 'oracle') slugCount.set(label, (slugCount.get(label) ?? 0) + 1);
     return {
       id: `${session}:${winpane}`,
       paneId: paneId || '',
       cwd: cwd || '',
+      mappedTeam: mapped?.team ?? null,
       session, windowName: windowName || '', role, label,
       glyph, task: taskText(title || '', glyph),
       status: statusOf(cmd || '', glyph),
@@ -102,14 +120,15 @@ export async function getFleetState(): Promise<FleetState> {
   });
   const idByPane = new Map(draft.filter((d) => d.paneId).map((d) => [d.paneId, d.id]));
 
-  const agents: FleetAgent[] = draft.map(({ cwd, ...rest }) => {
-    // A slug becomes a team plot when it's a real maw team OR shared by >1 live pane.
-    // Orchestrators are halls, never plot members; `oracle` home panes go to commons.
-    const isTeam =
-      !rest.isOrchestrator && !!rest.label && rest.label !== 'oracle' &&
-      (known.has(rest.label) || (slugCount.get(rest.label) ?? 0) > 1);
+  const agents: FleetAgent[] = draft.map(({ cwd, mappedTeam, ...rest }) => {
+    // A pane is a team member when maw mapped it (mappedTeam), or its slug is a real
+    // maw team / shared by >1 live pane. Orchestrators are leads, never plot members.
+    const isTeam = !rest.isOrchestrator && (
+      mappedTeam != null ||
+      (!!rest.label && rest.label !== 'oracle' && (known.has(rest.label) || (slugCount.get(rest.label) ?? 0) > 1))
+    );
     const ctx = rest.status === 'offline' ? null : contextForCwd(cwd);
-    return { ...rest, team: isTeam ? rest.label : null, ctxPct: ctx?.pct, ctxModel: ctx?.model };
+    return { ...rest, team: isTeam ? (mappedTeam ?? rest.label) : null, ctxPct: ctx?.pct, ctxModel: ctx?.model };
   });
 
   // Teams (only those with ≥1 live member render — dead maw teams are skipped).
