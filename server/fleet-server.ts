@@ -12,6 +12,7 @@
 import { join, normalize } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
 import { getFleetState } from './fleet-probe';
+import { capturePane, sendToPane } from './pane-io';
 
 const DIST = join(import.meta.dir, '..', 'dist');
 const PORT = Number(process.env.FLEET_PORT || 8788);
@@ -44,6 +45,18 @@ const server = Bun.serve({
       } catch (e) {
         return Response.json({ ...EMPTY, ts: new Date().toISOString(), error: (e as Error).message });
       }
+    }
+
+    if (p === '/__fleet/pane') {
+      try { return Response.json({ text: capturePane(url.searchParams.get('id') || '') }); }
+      catch (e) { return Response.json({ error: (e as Error).message }, { status: 400 }); }
+    }
+    if (p === '/__fleet/send' && req.method === 'POST') {
+      try {
+        const b = (await req.json()) as { id?: string; text?: string };
+        sendToPane(b.id || '', b.text || '');
+        return Response.json({ ok: true });
+      } catch (e) { return Response.json({ error: (e as Error).message }, { status: 400 }); }
     }
 
     if (p.startsWith('/api/')) {

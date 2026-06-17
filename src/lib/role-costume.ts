@@ -78,3 +78,8 @@ export function charIndexFor(role: string): number {
   for (const c of role) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return h % 8;
 }
+
+/** Colour for a remaining-context % (green healthy → red nearly full). */
+export function ctxColor(pct: number): string {
+  return pct > 50 ? '#4ade80' : pct > 20 ? '#fbbf24' : '#f87171';
+}

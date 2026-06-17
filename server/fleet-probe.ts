@@ -8,6 +8,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { homedir, hostname } from 'node:os';
 import { join } from 'node:path';
 import { parseWindow } from '../src/lib/role-costume';
+import { contextForCwd } from './context';
 import type { FleetState, FleetAgent, FleetTeam, FleetRoad, AgentStatus } from '../src/lib/fleet';
 
 const SEP = '<|FLEET|>'; // printable token — safe vs. titles (spaces / Thai / punctuation)
@@ -18,6 +19,7 @@ const FMT = [
   '#{pane_title}',
   '#{pane_current_command}',
   '#{pane_id}', // %NN — matches a team's createdByPane (set by `maw team create`)
+  '#{pane_current_path}', // cwd → resolve the Claude transcript for context %
 ].join(SEP);
 
 const TEAMS_DIR = join(homedir(), '.claude/teams');
@@ -84,13 +86,14 @@ export async function getFleetState(): Promise<FleetState> {
 
   // First pass → agents (team assignment needs slug frequencies, computed below).
   const slugCount = new Map<string, number>();
-  const draft = rows.map(([session, winpane, windowName, title, cmd, paneId]) => {
+  const draft = rows.map(([session, winpane, windowName, title, cmd, paneId, cwd]) => {
     const { role, label } = parseWindow(windowName || '');
     const glyph = firstRune(title || '');
     if (label && label !== 'oracle') slugCount.set(label, (slugCount.get(label) ?? 0) + 1);
     return {
       id: `${session}:${winpane}`,
       paneId: paneId || '',
+      cwd: cwd || '',
       session, windowName: windowName || '', role, label,
       glyph, task: taskText(title || '', glyph),
       status: statusOf(cmd || '', glyph),
@@ -99,13 +102,14 @@ export async function getFleetState(): Promise<FleetState> {
   });
   const idByPane = new Map(draft.filter((d) => d.paneId).map((d) => [d.paneId, d.id]));
 
-  const agents: FleetAgent[] = draft.map((d) => {
+  const agents: FleetAgent[] = draft.map(({ cwd, ...rest }) => {
     // A slug becomes a team plot when it's a real maw team OR shared by >1 live pane.
     // Orchestrators are halls, never plot members; `oracle` home panes go to commons.
     const isTeam =
-      !d.isOrchestrator && !!d.label && d.label !== 'oracle' &&
-      (known.has(d.label) || (slugCount.get(d.label) ?? 0) > 1);
-    return { ...d, team: isTeam ? d.label : null };
+      !rest.isOrchestrator && !!rest.label && rest.label !== 'oracle' &&
+      (known.has(rest.label) || (slugCount.get(rest.label) ?? 0) > 1);
+    const ctx = rest.status === 'offline' ? null : contextForCwd(cwd);
+    return { ...rest, team: isTeam ? rest.label : null, ctxPct: ctx?.pct, ctxModel: ctx?.model };
   });
 
   // Teams (only those with ≥1 live member render — dead maw teams are skipped).

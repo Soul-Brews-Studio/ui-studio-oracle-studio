@@ -8,6 +8,7 @@ export type AgentStatus = 'working' | 'idle' | 'offline';
 
 export interface FleetAgent {
   id: string;          // "01-soul-brews:6.0" (session:window.pane — stable key)
+  paneId: string;      // tmux pane id "%NN" — target for capture/send
   session: string;     // tmux session → district / zone
   windowName: string;  // "orchestrator-botlog"
   role: string;        // costume key (see role-costume.ts)
@@ -17,6 +18,8 @@ export interface FleetAgent {
   glyph: string;       // raw leading glyph of the title (debug + animation phase)
   team: string | null; // campaign plot it belongs to, or null for the commons
   isOrchestrator: boolean;
+  ctxPct?: number;     // context window REMAINING (0–100), like brewbot /ctx
+  ctxModel?: string;   // model id behind that context window
 }
 
 export interface FleetTeam {
@@ -63,6 +66,29 @@ export async function fetchFleet(signal?: AbortSignal): Promise<FleetState> {
   const res = await fetch(FLEET_ENDPOINT, { signal });
   if (!res.ok) throw new Error(`fleet ${res.status}`);
   return (await res.json()) as FleetState;
+}
+
+// Agent text-session endpoints (same-origin, outside /api like FLEET_ENDPOINT).
+export const PANE_ENDPOINT = '/__fleet/pane';
+export const SEND_ENDPOINT = '/__fleet/send';
+
+/** Capture a pane's rendered text (the agent's live terminal session). */
+export async function capturePane(paneId: string, signal?: AbortSignal): Promise<string> {
+  const res = await fetch(`${PANE_ENDPOINT}?id=${encodeURIComponent(paneId)}`, { signal });
+  const j = await res.json();
+  if (!res.ok || j.error) throw new Error(j.error || `pane ${res.status}`);
+  return j.text as string;
+}
+
+/** Type a line into the agent's pane and submit it (Enter). */
+export async function sendToPane(paneId: string, text: string): Promise<void> {
+  const res = await fetch(SEND_ENDPOINT, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ id: paneId, text }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok || j.error) throw new Error(j.error || `send ${res.status}`);
 }
 
 export interface UseFleet {

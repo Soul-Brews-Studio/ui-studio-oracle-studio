@@ -4,10 +4,12 @@
 // pixel sprites on a grass map; List view = readable cards. Mirror, never drives.
 import { useMemo, useState } from 'react';
 import { useFleet } from '../lib/fleet';
+import type { FleetAgent } from '../lib/fleet';
 import { groupTown } from '../lib/town-group';
 import { costumeFor, KNOWN_ROLES } from '../lib/role-costume';
 import { District } from '../components/town/District';
 import { PixelTown } from '../components/town/PixelTown';
+import { AgentChat } from '../components/town/AgentChat';
 import './Town.css';
 
 type TownView = 'map' | 'list';
@@ -31,6 +33,9 @@ export function Town() {
   const { state, loading, error, lastOk } = useFleet(2000);
   const districts = useMemo(() => groupTown(state), [state]);
   const [view, setView] = useState<TownView>('map');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = selectedId ? state.agents.find((a) => a.id === selectedId) ?? null : null;
+  const openAgent = (a: FleetAgent) => setSelectedId(a.id);
 
   const rolesPresent = useMemo(() => {
     const set = new Set(state.agents.map((a) => a.role));
@@ -79,7 +84,7 @@ export function Town() {
             );
           })}
           <span className="text-white/30">·</span>
-          <span className="text-white/40">👑 = orchestrator (grouped with its team) · ⠂ working · ✳ asleep · grey offline</span>
+          <span className="text-white/40">👑 orchestrator (with its team) · ⠂ working · ✳ asleep · grey offline · bar = context left · click an agent to open its session</span>
         </div>
       </header>
 
@@ -89,13 +94,15 @@ export function Town() {
         </div>
       )}
 
-      {view === 'map' && <PixelTown state={state} />}
+      {view === 'map' && <PixelTown state={state} onSelect={openAgent} />}
 
       {view === 'list' && (
         <div className="flex flex-col gap-3">
-          {districts.map((d) => <District key={d.session} d={d} />)}
+          {districts.map((d) => <District key={d.session} d={d} onSelect={openAgent} />)}
         </div>
       )}
+
+      {selected && <AgentChat agent={selected} onClose={() => setSelectedId(null)} />}
 
       {loading && !state.agents.length && (
         <p className="text-center text-white/40 py-12">scanning the fleet…</p>

@@ -1,7 +1,8 @@
 // One agent = one avatar tile. Costume (emoji + colour) identifies the ROLE;
 // the label tag distinguishes duplicate roles; the status dot/animation shows
-// working (walking) vs asleep (✳ + drifting z) vs offline (greyed).
-import { costumeFor } from '../../lib/role-costume';
+// working (walking) vs asleep (✳ + drifting z) vs offline (greyed). A thin bar
+// shows remaining context %. Click to open the agent's text session.
+import { costumeFor, ctxColor } from '../../lib/role-costume';
 import type { FleetAgent } from '../../lib/fleet';
 
 const STATUS_DOT: Record<FleetAgent['status'], string> = {
@@ -12,17 +13,17 @@ const STATUS_DOT: Record<FleetAgent['status'], string> = {
 
 interface Props {
   agent: FleetAgent;
-  registerRef?: (id: string, el: HTMLElement | null) => void;
+  onSelect?: (a: FleetAgent) => void;
   ring?: string;
 }
 
-export function AgentTile({ agent, registerRef, ring }: Props) {
+export function AgentTile({ agent, onSelect, ring }: Props) {
   const c = costumeFor(agent.role);
   const dot = STATUS_DOT[agent.status];
   return (
     <div
-      ref={(el) => registerRef?.(agent.id, el)}
-      className={`town-${agent.status} relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 border`}
+      onClick={() => onSelect?.(agent)}
+      className={`town-${agent.status} relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 border cursor-pointer`}
       style={{
         background: '#0f0f14',
         borderColor: ring ?? 'rgba(255,255,255,0.08)',
@@ -31,7 +32,7 @@ export function AgentTile({ agent, registerRef, ring }: Props) {
         minWidth: 150,
         maxWidth: 230,
       }}
-      title={`${agent.windowName}\n${agent.task || '—'}`}
+      title={`${agent.windowName}\n${agent.task || '—'}\n(click to open session)`}
     >
       <div
         className="town-avatar grid place-items-center rounded-full shrink-0"
@@ -47,6 +48,14 @@ export function AgentTile({ agent, registerRef, ring }: Props) {
           )}
         </div>
         <div className="text-[10.5px] truncate text-white/50">{agent.task || '—'}</div>
+        {agent.ctxPct != null && (
+          <div className="mt-1 flex items-center gap-1">
+            <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
+              <div style={{ width: `${agent.ctxPct}%`, height: '100%', background: ctxColor(agent.ctxPct) }} />
+            </div>
+            <span className="text-[8.5px] font-mono shrink-0" style={{ color: ctxColor(agent.ctxPct) }}>{agent.ctxPct}%</span>
+          </div>
+        )}
       </div>
       <div className="flex flex-col items-center justify-center gap-0.5 shrink-0 w-4">
         <span

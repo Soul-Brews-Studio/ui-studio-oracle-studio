@@ -1,10 +1,11 @@
 // A district = one tmux session. Renders its clusters: a campaign card groups an
 // orchestrator (lead, 👑) with the workers it dispatched; a team card is a
 // leaderless maw team; commons holds un-teamed / home / offline panes.
+import type { FleetAgent } from '../../lib/fleet';
 import type { TownDistrict, TownCluster } from '../../lib/town-group';
 import { AgentTile } from './AgentTile';
 
-function ClusterCard({ c }: { c: TownCluster }) {
+function ClusterCard({ c, onSelect }: { c: TownCluster; onSelect: (a: FleetAgent) => void }) {
   const icon = c.kind === 'campaign' ? '🎩' : c.kind === 'team' ? '🏠' : null;
   const count = (c.lead ? 1 : 0) + c.members.length;
   const border = c.kind === 'campaign' ? 'rgba(192,132,252,0.45)' : c.kind === 'team' ? 'rgba(150,210,150,0.3)' : 'rgba(255,255,255,0.1)';
@@ -21,14 +22,14 @@ function ClusterCard({ c }: { c: TownCluster }) {
         </div>
       )}
       <div className={c.kind === 'commons' ? 'flex flex-wrap gap-1.5' : 'flex flex-col gap-1.5'}>
-        {c.lead && <AgentTile agent={c.lead} ring="#c084fc" />}
-        {c.members.map((m) => <AgentTile key={m.id} agent={m} />)}
+        {c.lead && <AgentTile agent={c.lead} ring="#c084fc" onSelect={onSelect} />}
+        {c.members.map((m) => <AgentTile key={m.id} agent={m} onSelect={onSelect} />)}
       </div>
     </div>
   );
 }
 
-export function District({ d }: { d: TownDistrict }) {
+export function District({ d, onSelect }: { d: TownDistrict; onSelect: (a: FleetAgent) => void }) {
   return (
     <section className="rounded-xl border border-white/[0.08] p-3" style={{ background: '#0c0c12' }}>
       <header className="flex items-center justify-between mb-2.5">
@@ -43,7 +44,7 @@ export function District({ d }: { d: TownDistrict }) {
         </div>
       </header>
       <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(210px,1fr))' }}>
-        {d.clusters.map((c) => <ClusterCard key={c.key} c={c} />)}
+        {d.clusters.map((c) => <ClusterCard key={c.key} c={c} onSelect={onSelect} />)}
       </div>
     </section>
   );

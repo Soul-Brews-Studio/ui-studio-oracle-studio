@@ -3,10 +3,10 @@
 // offline. Districts/plots are fenced zones on a grass map; dispatch roads link
 // orchestrators to the workers they spawned. Same /__fleet/state data as the list view.
 import { useEffect, useMemo, useRef } from 'react';
-import type { FleetState } from '../../lib/fleet';
+import type { FleetState, FleetAgent } from '../../lib/fleet';
 import { groupTown } from '../../lib/town-group';
 import { buildStage } from '../../lib/town-stage';
-import { costumeFor, charIndexFor } from '../../lib/role-costume';
+import { costumeFor, charIndexFor, ctxColor } from '../../lib/role-costume';
 import { SHEET_URL, SHEET_W, SHEET_H, SPRITE, bgPos } from '../../lib/sprite';
 
 interface Actor {
@@ -24,7 +24,7 @@ function pickTarget(a: Actor) {
   a.waitT = rnd(300, 1600); // pause on arrival
 }
 
-export function PixelTown({ state }: { state: FleetState }) {
+export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a: FleetAgent) => void }) {
   const districts = useMemo(() => groupTown(state), [state]);
   const stage = useMemo(() => buildStage(districts), [districts]);
   const actors = useRef<Map<string, Actor>>(new Map());
@@ -127,19 +127,22 @@ export function PixelTown({ state }: { state: FleetState }) {
             key={a.id}
             ref={(el) => { if (el) els.current.set(a.id, el); else els.current.delete(a.id); }}
             className={`town-actor town-actor-${a.status}`}
+            onClick={() => onSelect(a)}
             style={{
               width: SPRITE, height: SPRITE,
+              cursor: 'pointer',
               backgroundImage: `url(${SHEET_URL})`,
               backgroundSize: `${SHEET_W}px ${SHEET_H}px`,
               backgroundPosition: bgPos(charIndexFor(a.role), 0, 0),
               transform: `translate(${p.home.x}px, ${p.home.y}px)`,
             }}
-            title={`${a.windowName}\n${a.task || '—'}`}
+            title={`${a.windowName}\n${a.task || '—'}\n(click to open session)`}
           >
             {a.isOrchestrator && <span className="town-crown">👑</span>}
             <span className="town-nametag" style={{ borderColor: cos.color }}>
               <b style={{ color: cos.color }}>{cos.title}</b>
               {a.label && a.label !== 'oracle' ? <span className="town-nametag-slug">·{a.label}</span> : null}
+              {a.ctxPct != null ? <span className="town-nametag-slug" style={{ color: ctxColor(a.ctxPct) }}> {a.ctxPct}%</span> : null}
             </span>
             {a.status === 'idle' && <span className="town-zzz town-zzz-pixel">z</span>}
           </div>
