@@ -34,3 +34,52 @@
   .town-zzz,
   .town-road { animation: none; }
 }
+
+/* ---- Pixel map view (ai-town style) ---- */
+.town-stage {
+  position: relative;
+  image-rendering: pixelated;
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: #16271a;
+  background-image:
+    repeating-linear-gradient(0deg, #1b3322 0 9px, #16291c 9px 18px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0 9px, transparent 9px 18px),
+    radial-gradient(rgba(120,180,110,0.10) 1px, transparent 1px);
+  background-size: auto, auto, 18px 18px;
+  box-shadow: inset 0 0 90px rgba(0,0,0,0.55);
+}
+.town-district-label {
+  position: absolute;
+  font-weight: 700; font-size: 13px; color: #e6ffe9;
+  text-shadow: 0 1px 3px #000; z-index: 5;
+}
+.town-dcount { font-weight: 400; font-size: 10px; color: #cfe8d0; margin-left: 6px; }
+.town-zone {
+  position: absolute; border-radius: 7px; box-sizing: border-box;
+}
+.town-zone-plot { border: 3px dashed rgba(150,210,150,0.32); background: rgba(120,200,120,0.06); }
+.town-zone-hall { border: 3px solid rgba(192,132,252,0.45); background: rgba(192,132,252,0.08); }
+.town-zone-commons { border: 2px dotted rgba(255,255,255,0.14); background: rgba(255,255,255,0.02); }
+.town-zone-label {
+  position: absolute; top: 3px; left: 7px; font-size: 11px; font-weight: 600;
+  color: #e9ffe9; text-shadow: 0 1px 2px #000; white-space: nowrap;
+}
+.town-actor {
+  position: absolute; left: 0; top: 0;
+  background-repeat: no-repeat; image-rendering: pixelated;
+  will-change: transform; z-index: 3;
+}
+.town-actor-offline { filter: grayscale(1) brightness(0.5); opacity: 0.5; }
+.town-actor-idle { filter: brightness(0.9); }
+.town-nametag {
+  position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+  white-space: nowrap; font-size: 9px; line-height: 1.4;
+  background: rgba(0,0,0,0.72); border: 1px solid; border-radius: 4px;
+  padding: 0 4px; pointer-events: none;
+}
+.town-nametag-slug { color: rgba(255,255,255,0.5); margin-left: 2px; }
+.town-zzz-pixel {
+  position: absolute; top: -16px; right: 2px;
+  color: rgba(255,255,255,0.65); font-size: 12px; font-weight: 700; pointer-events: none;
+}

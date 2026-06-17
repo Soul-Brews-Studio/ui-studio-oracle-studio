@@ -8,7 +8,10 @@ import { groupTown } from '../lib/town-group';
 import { costumeFor, KNOWN_ROLES } from '../lib/role-costume';
 import { District } from '../components/town/District';
 import { RoadLayer } from '../components/town/RoadLayer';
+import { PixelTown } from '../components/town/PixelTown';
 import './Town.css';
+
+type TownView = 'map' | 'list';
 
 function Chip({ dot, label, value }: { dot: string; label: string; value: number }) {
   return (
@@ -31,6 +34,7 @@ export function Town() {
   const containerRef = useRef<HTMLDivElement>(null);
   const refs = useRef<Map<string, HTMLElement>>(new Map());
   const [hoveredOrc, setHoveredOrc] = useState<string | null>(null);
+  const [view, setView] = useState<TownView>('map');
 
   const dispatchMap = useMemo(() => {
     const byId = new Map(state.agents.map((a) => [a.id, a]));
@@ -76,6 +80,18 @@ export function Town() {
             <Chip dot="#fbbf24" label="asleep" value={c.idle} />
             <Chip dot="#555" label="offline" value={c.offline} />
             <Chip dot="#c084fc" label="teams" value={c.teams} />
+            <div className="inline-flex rounded-full border border-white/10 overflow-hidden text-[11px]">
+              {(['map', 'list'] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setView(v)}
+                  className="px-2.5 py-1"
+                  style={{ background: view === v ? '#c084fc22' : 'transparent', color: view === v ? '#d9bbff' : '#888' }}
+                >
+                  {v === 'map' ? '🗺 Map' : '☰ List'}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -100,21 +116,25 @@ export function Town() {
         </div>
       )}
 
-      <div ref={containerRef} className="relative">
-        <RoadLayer roads={state.roads} container={containerRef} refs={refs} version={state.ts} />
-        <div className="relative z-10 flex flex-col gap-3">
-          {districts.map((d) => (
-            <District
-              key={d.session}
-              d={d}
-              registerRef={registerRef}
-              dispatchMap={dispatchMap}
-              setHoveredOrc={setHoveredOrc}
-              ringFor={ringFor}
-            />
-          ))}
+      {view === 'map' && <PixelTown state={state} />}
+
+      {view === 'list' && (
+        <div ref={containerRef} className="relative">
+          <RoadLayer roads={state.roads} container={containerRef} refs={refs} version={state.ts} />
+          <div className="relative z-10 flex flex-col gap-3">
+            {districts.map((d) => (
+              <District
+                key={d.session}
+                d={d}
+                registerRef={registerRef}
+                dispatchMap={dispatchMap}
+                setHoveredOrc={setHoveredOrc}
+                ringFor={ringFor}
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {loading && !state.agents.length && (
         <p className="text-center text-white/40 py-12">scanning the fleet…</p>

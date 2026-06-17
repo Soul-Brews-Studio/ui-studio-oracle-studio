@@ -60,3 +60,21 @@ export function costumeFor(role: string): Costume {
 }
 
 export const KNOWN_ROLES = ROLE_KEYS;
+
+// Role → ai-town character index (0–7 = f1–f8 on the folk spritesheet). Only 8
+// sprites for ~17 roles, so some share a body — the costume colour + name-tag
+// still disambiguate. Indices chosen so commonly co-present roles differ.
+const CHAR_INDEX: Record<string, number> = {
+  'brew-ops': 0, 'next-architect': 1, 'next-live-tester': 2, 'next-dev': 3,
+  'next-ui': 4, 'orchestrator': 5, 'next-tester': 6, 'pg-tester': 7,
+  'next-impl': 1, 'pg-writer': 2, 'nextbot-dev': 3, 'next-writer': 4,
+  'next-pm': 5, 'next-code-reviewer': 6, 'next-investigator': 7,
+  'bot-writer': 6, 'finance-auditor': 0,
+};
+
+export function charIndexFor(role: string): number {
+  if (role in CHAR_INDEX) return CHAR_INDEX[role];
+  let h = 0;
+  for (const c of role) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return h % 8;
+}
