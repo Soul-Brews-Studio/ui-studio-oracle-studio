@@ -6,7 +6,6 @@ import { useMemo, useState } from 'react';
 import { useFleet } from '../lib/fleet';
 import type { FleetAgent } from '../lib/fleet';
 import { groupTown } from '../lib/town-group';
-import { costumeFor, KNOWN_ROLES } from '../lib/role-costume';
 import { District } from '../components/town/District';
 import { PixelTown } from '../components/town/PixelTown';
 import { AgentChat } from '../components/town/AgentChat';
@@ -37,59 +36,33 @@ export function Town() {
   const selected = selectedId ? state.agents.find((a) => a.id === selectedId) ?? null : null;
   const openAgent = (a: FleetAgent) => setSelectedId(a.id);
 
-  const rolesPresent = useMemo(() => {
-    const set = new Set(state.agents.map((a) => a.role));
-    return KNOWN_ROLES.filter((r) => set.has(r));
-  }, [state]);
-
   const c = state.counts;
   return (
-    <div className="max-w-[1400px] mx-auto px-4 py-5">
-      <header className="mb-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold text-white/90">🏘 Fleet Town</h1>
-            <p className="text-[12px] text-white/45">
-              live mirror of the tmux agent fleet · {state.host || '…'} · updated {ago(lastOk)}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Chip dot="#4ade80" label="working" value={c.working} />
-            <Chip dot="#fbbf24" label="asleep" value={c.idle} />
-            <Chip dot="#555" label="offline" value={c.offline} />
-            <Chip dot="#c084fc" label="teams" value={c.teams} />
-            <div className="inline-flex rounded-full border border-white/10 overflow-hidden text-[11px]">
-              {(['map', 'list'] as const).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => setView(v)}
-                  className="px-2.5 py-1"
-                  style={{ background: view === v ? '#c084fc22' : 'transparent', color: view === v ? '#d9bbff' : '#888' }}
-                >
-                  {v === 'map' ? '🗺 Map' : '☰ List'}
-                </button>
-              ))}
-            </div>
+    <div className="px-3 py-3">
+      <div className="flex flex-wrap items-center gap-2 mb-2">
+        <Chip dot="#4ade80" label="working" value={c.working} />
+        <Chip dot="#fbbf24" label="asleep" value={c.idle} />
+        <Chip dot="#555" label="offline" value={c.offline} />
+        <Chip dot="#c084fc" label="teams" value={c.teams} />
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-[10px] text-white/35 font-mono">{state.host || '…'} · {ago(lastOk)}</span>
+          <div className="inline-flex rounded-full border border-white/10 overflow-hidden text-[11px]">
+            {(['map', 'list'] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className="px-2.5 py-1"
+                style={{ background: view === v ? '#c084fc22' : 'transparent', color: view === v ? '#d9bbff' : '#888' }}
+              >
+                {v === 'map' ? '🗺 Map' : '☰ List'}
+              </button>
+            ))}
           </div>
         </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-white/55">
-          {rolesPresent.map((r) => {
-            const cos = costumeFor(r);
-            return (
-              <span key={r} className="inline-flex items-center gap-1">
-                <span style={{ fontSize: 14 }}>{cos.emoji}</span>
-                <span style={{ color: cos.color }}>{cos.title}</span>
-              </span>
-            );
-          })}
-          <span className="text-white/30">·</span>
-          <span className="text-white/40">👑 orchestrator (with its team) · ⠂ working · ✳ asleep · grey offline · bar = context left · click an agent to open its session</span>
-        </div>
-      </header>
+      </div>
 
       {error && (
-        <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-[12px] text-red-300">
+        <div className="mb-2 rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-[12px] text-red-300">
           fleet probe error: {error}
         </div>
       )}

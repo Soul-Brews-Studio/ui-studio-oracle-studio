@@ -2,7 +2,7 @@
 // zone with a walk-cycle when working, stands with a 💤 when idle, fades when
 // offline. Districts/plots are fenced zones on a grass map; dispatch roads link
 // orchestrators to the workers they spawned. Same /__fleet/state data as the list view.
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FleetState, FleetAgent } from '../../lib/fleet';
 import { groupTown } from '../../lib/town-group';
 import { buildStage } from '../../lib/town-stage';
@@ -26,9 +26,23 @@ function pickTarget(a: Actor) {
 
 export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a: FleetAgent) => void }) {
   const districts = useMemo(() => groupTown(state), [state]);
-  const stage = useMemo(() => buildStage(districts), [districts]);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(1180);
+  const stage = useMemo(() => buildStage(districts, width), [districts, width]);
   const actors = useRef<Map<string, Actor>>(new Map());
   const els = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Fill the available width — the walking area grows with the viewport.
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const w = Math.floor(entries[0].contentRect.width);
+      if (w > 0) setWidth(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Reconcile actor state with the current placements (add/update/remove).
   useEffect(() => {
@@ -92,6 +106,7 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
   };
 
   return (
+    <div ref={wrapRef} className="w-full">
     <div className="town-stage" style={{ width: stage.width, height: stage.height }}>
       <svg className="absolute inset-0 pointer-events-none" width={stage.width} height={stage.height}>
         {state.roads.map((r) => {
@@ -148,6 +163,7 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
           </div>
         );
       })}
+    </div>
     </div>
   );
 }
