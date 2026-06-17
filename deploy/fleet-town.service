@@ -1,0 +1,17 @@
+[Unit]
+Description=Fleet Town — oracle-studio /town live tmux-fleet mirror
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/Code/github.com/Soul-Brews-Studio/oracle-studio
+ExecStart=/home/ubuntu/.bun/bin/bun server/fleet-server.ts
+Environment=FLEET_PORT=8788
+Environment=FLEET_HOST=127.0.0.1
+Environment=ORACLE_API_URL=http://localhost:47778
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

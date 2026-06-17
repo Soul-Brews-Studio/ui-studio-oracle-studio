@@ -1,0 +1,67 @@
+// Persistent production server for the Fleet Town (MVP-2).
+//
+// Unlike the Vite dev plugin, this is an always-on Bun server that serves the
+// built studio bundle (dist/) + the live /__fleet/state endpoint. It is meant to
+// run behind Caddy (basic-auth + HTTPS) and bind to localhost only.
+//
+// Town is deliberately ISOLATED from the memory backbone: only the two SPA-gate
+// endpoints (/api/health, /api/auth/status) are forwarded to the Oracle API; every
+// other /api/* path is refused, so exposing the town never exposes Oracle memory.
+//
+//   bun server/fleet-server.ts            # FLEET_PORT=8788 by default
+import { join, normalize } from 'node:path';
+import { existsSync, statSync } from 'node:fs';
+import { getFleetState } from './fleet-probe';
+
+const DIST = join(import.meta.dir, '..', 'dist');
+const PORT = Number(process.env.FLEET_PORT || 8788);
+const HOST = process.env.FLEET_HOST || '127.0.0.1';
+const ORACLE = process.env.ORACLE_API_URL || 'http://localhost:47778';
+const API_ALLOW = new Set(['/api/health', '/api/auth/status']);
+
+// The studio's host resolver (src/api/host.ts) defaults /api to http://localhost:47778
+// (the VIEWER's machine), which fails on a remote origin and trips BackendGate. Seed
+// localStorage with the page origin BEFORE the app bundle evaluates so /api resolves
+// same-origin → our forwarded /api/health passes the gate (the rest of /api stays 404'd).
+const SEED = `<script>try{var k='oracle-studio-host';if(!localStorage.getItem(k))localStorage.setItem(k,location.origin);}catch(e){}</script>`;
+const INDEX_HTML = (await Bun.file(join(DIST, 'index.html')).text()).replace('<head>', '<head>' + SEED);
+
+const EMPTY = {
+  ts: '', host: '', agents: [], teams: [], roads: [],
+  counts: { working: 0, idle: 0, offline: 0, teams: 0, agents: 0 },
+};
+
+const server = Bun.serve({
+  port: PORT,
+  hostname: HOST,
+  async fetch(req) {
+    const url = new URL(req.url);
+    const p = url.pathname;
+
+    if (p === '/__fleet/state') {
+      try {
+        return Response.json(await getFleetState(), { headers: { 'cache-control': 'no-store' } });
+      } catch (e) {
+        return Response.json({ ...EMPTY, ts: new Date().toISOString(), error: (e as Error).message });
+      }
+    }
+
+    if (p.startsWith('/api/')) {
+      if (API_ALLOW.has(p)) {
+        return fetch(ORACLE + p + url.search, { method: req.method, headers: req.headers });
+      }
+      return Response.json({ error: 'not exposed on the town server' }, { status: 404 });
+    }
+
+    // Static dist with SPA fallback so client-side routing (/town) resolves.
+    const safe = normalize(p).replace(/^(\.\.(\/|\\|$))+/, '');
+    const file = join(DIST, safe);
+    if (file.startsWith(DIST) && p !== '/' && existsSync(file) && statSync(file).isFile()) {
+      return new Response(Bun.file(file));
+    }
+    // SPA entry — serve the origin-seeded index.html (see SEED above).
+    return new Response(INDEX_HTML, { headers: { 'content-type': 'text/html;charset=utf-8' } });
+  },
+});
+
+console.log(`fleet-server listening on http://${server.hostname}:${server.port} (dist=${DIST})`);
