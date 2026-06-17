@@ -17,6 +17,7 @@ const FMT = [
   '#{window_name}',
   '#{pane_title}',
   '#{pane_current_command}',
+  '#{pane_id}', // %NN — matches a team's createdByPane (set by `maw team create`)
 ].join(SEP);
 
 const TEAMS_DIR = join(homedir(), '.claude/teams');
@@ -50,15 +51,20 @@ function taskText(title: string, glyph: string): string {
 }
 
 /** Team names backed by ~/.claude/teams/<name>/config.json (with descriptions). */
-function knownTeams(): Map<string, string> {
-  const m = new Map<string, string>();
+interface TeamMeta { description: string; createdByPane?: string }
+
+function knownTeams(): Map<string, TeamMeta> {
+  const m = new Map<string, TeamMeta>();
   try {
     for (const dir of readdirSync(TEAMS_DIR)) {
       const cfg = join(TEAMS_DIR, dir, 'config.json');
       if (!existsSync(cfg)) continue;
       try {
         const j = JSON.parse(readFileSync(cfg, 'utf8'));
-        m.set(dir, typeof j?.description === 'string' ? j.description : '');
+        m.set(dir, {
+          description: typeof j?.description === 'string' ? j.description : '',
+          createdByPane: typeof j?.createdByPane === 'string' && j.createdByPane ? j.createdByPane : undefined,
+        });
       } catch { /* skip malformed */ }
     }
   } catch { /* no teams dir */ }
@@ -78,18 +84,20 @@ export async function getFleetState(): Promise<FleetState> {
 
   // First pass → agents (team assignment needs slug frequencies, computed below).
   const slugCount = new Map<string, number>();
-  const draft = rows.map(([session, winpane, windowName, title, cmd]) => {
+  const draft = rows.map(([session, winpane, windowName, title, cmd, paneId]) => {
     const { role, label } = parseWindow(windowName || '');
     const glyph = firstRune(title || '');
     if (label && label !== 'oracle') slugCount.set(label, (slugCount.get(label) ?? 0) + 1);
     return {
       id: `${session}:${winpane}`,
+      paneId: paneId || '',
       session, windowName: windowName || '', role, label,
       glyph, task: taskText(title || '', glyph),
       status: statusOf(cmd || '', glyph),
       isOrchestrator: role === 'orchestrator',
     };
   });
+  const idByPane = new Map(draft.filter((d) => d.paneId).map((d) => [d.paneId, d.id]));
 
   const agents: FleetAgent[] = draft.map((d) => {
     // A slug becomes a team plot when it's a real maw team OR shared by >1 live pane.
@@ -106,7 +114,7 @@ export async function getFleetState(): Promise<FleetState> {
     if (!a.team) continue;
     let t = teamMap.get(a.team);
     if (!t) {
-      t = { name: a.team, session: a.session, members: [], known: known.has(a.team), description: known.get(a.team) || undefined };
+      t = { name: a.team, session: a.session, members: [], known: known.has(a.team), description: known.get(a.team)?.description || undefined };
       teamMap.set(a.team, t);
     }
     t.members.push(a.id);
@@ -116,14 +124,31 @@ export async function getFleetState(): Promise<FleetState> {
   // Dispatch roads: orchestrator → worker whose slug extends the orchestrator's slug
   // (e.g. orchestrator-botlog → next-dev-botlogbot). Best-effort; honest when absent.
   const roads: FleetRoad[] = [];
+  const roadSet = new Set<string>();
+  const addRoad = (from: string, to: string) => {
+    if (from === to) return;
+    const k = `${from}|${to}`;
+    if (!roadSet.has(k)) { roadSet.add(k); roads.push({ from, to }); }
+  };
   for (const o of agents) {
     if (!o.isOrchestrator) continue;
     const key = norm(o.label);
     if (key.length < 2) continue;
     for (const w of agents) {
       if (w.id === o.id || w.isOrchestrator) continue;
-      if (norm(w.label).startsWith(key)) roads.push({ from: o.id, to: w.id });
+      if (norm(w.label).startsWith(key)) addRoad(o.id, w.id);
     }
+  }
+
+  // Authoritative ownership: a team config's createdByPane (set by `maw team create`)
+  // names the orchestrator pane that spawned it — link it to its members even when
+  // the slugs don't match (e.g. orchestrator-live-payout → team "adminview").
+  for (const [name, meta] of known) {
+    if (!meta.createdByPane) continue;
+    const ownerId = idByPane.get(meta.createdByPane);
+    const owner = ownerId && agents.find((a) => a.id === ownerId);
+    if (!owner || !owner.isOrchestrator) continue;
+    for (const m of agents) if (m.team === name) addRoad(owner.id, m.id);
   }
 
   const counts = {
