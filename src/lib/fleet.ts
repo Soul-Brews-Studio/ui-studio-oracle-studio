@@ -122,6 +122,26 @@ export async function closePaneSession(paneId: string): Promise<void> {
   if (!res.ok || j.error) throw new Error(j.error || `close ${res.status}`);
 }
 
+/** Roles wakeable via `maw wake` (for the New Agent picker). */
+export async function fetchRoles(): Promise<string[]> {
+  const res = await fetch('/__fleet/roles');
+  const j = await res.json();
+  if (!res.ok || j.error) throw new Error(j.error || `roles ${res.status}`);
+  return (j.roles as string[]) ?? [];
+}
+
+/** Spawn a new agent (brewbot /new → maw wake). Returns maw's output text. */
+export async function newAgent(role: string, slug: string): Promise<string> {
+  const res = await fetch('/__fleet/new', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ role, slug }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok || j.error) throw new Error(j.error || `new ${res.status}`);
+  return (j.output as string) ?? '';
+}
+
 export interface UseFleet {
   state: FleetState;
   loading: boolean;

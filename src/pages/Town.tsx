@@ -9,6 +9,7 @@ import { groupTown } from '../lib/town-group';
 import { District } from '../components/town/District';
 import { PixelTown } from '../components/town/PixelTown';
 import { AgentChat } from '../components/town/AgentChat';
+import { NewAgent } from '../components/town/NewAgent';
 import './Town.css';
 
 type TownView = 'map' | 'list';
@@ -33,6 +34,7 @@ export function Town() {
   const districts = useMemo(() => groupTown(state), [state]);
   const [view, setView] = useState<TownView>('map');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showNew, setShowNew] = useState(false);
   const selected = selectedId ? state.agents.find((a) => a.id === selectedId) ?? null : null;
   const openAgent = (a: FleetAgent) => setSelectedId(a.id);
 
@@ -45,6 +47,11 @@ export function Town() {
         <Chip dot="#555" label="offline" value={c.offline} />
         <Chip dot="#c084fc" label="teams" value={c.teams} />
         <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => setShowNew(true)}
+            className="px-2.5 py-1 rounded-full text-[11px]"
+            style={{ background: '#4ade8022', color: '#4ade80', border: '1px solid #4ade8055' }}
+          >➕ new agent</button>
           <span className="text-[10px] text-white/35 font-mono">{state.host || '…'} · {ago(lastOk)}</span>
           <div className="inline-flex rounded-full border border-white/10 overflow-hidden text-[11px]">
             {(['map', 'list'] as const).map((v) => (
@@ -76,6 +83,7 @@ export function Town() {
       )}
 
       {selected && <AgentChat agent={selected} onClose={() => setSelectedId(null)} />}
+      {showNew && <NewAgent onClose={() => setShowNew(false)} />}
 
       {loading && !state.agents.length && (
         <p className="text-center text-white/40 py-12">scanning the fleet…</p>

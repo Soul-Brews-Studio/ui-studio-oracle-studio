@@ -12,6 +12,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { getFleetState } from './fleet-probe';
 import { capturePane, sendToPane, sendKey, closePane } from './pane-io';
 import { transcriptFor } from './transcript';
+import { listRoles, spawnAgent } from './agents';
 
 const json = (res: ServerResponse, body: unknown, status = 200) => {
   res.statusCode = status;
@@ -60,6 +61,15 @@ export function fleetTownPlugin(): Plugin {
       server.middlewares.use('/__fleet/close', async (req, res) => {
         try { const b = JSON.parse((await readBody(req)) || '{}'); closePane(b.id || ''); json(res, { ok: true }); }
         catch (e) { json(res, { error: (e as Error).message }, 400); }
+      });
+      server.middlewares.use('/__fleet/roles', (_req, res) => {
+        try { json(res, { roles: listRoles() }); } catch (e) { json(res, { error: (e as Error).message }, 400); }
+      });
+      server.middlewares.use('/__fleet/new', async (req, res) => {
+        try {
+          const b = JSON.parse((await readBody(req)) || '{}');
+          json(res, { ok: true, output: spawnAgent(b.role || '', b.slug || '') });
+        } catch (e) { json(res, { error: (e as Error).message }, 400); }
       });
     },
   };

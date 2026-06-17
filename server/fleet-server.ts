@@ -14,6 +14,7 @@ import { existsSync, statSync } from 'node:fs';
 import { getFleetState } from './fleet-probe';
 import { capturePane, sendToPane, sendKey, closePane } from './pane-io';
 import { transcriptFor } from './transcript';
+import { listRoles, spawnAgent } from './agents';
 
 const DIST = join(import.meta.dir, '..', 'dist');
 const PORT = Number(process.env.FLEET_PORT || 8788);
@@ -64,6 +65,17 @@ const server = Bun.serve({
         if (b.key) sendKey(b.id || '', b.key);
         else sendToPane(b.id || '', b.text || '');
         return Response.json({ ok: true });
+      } catch (e) { return Response.json({ error: (e as Error).message }, { status: 400 }); }
+    }
+    if (p === '/__fleet/roles') {
+      try { return Response.json({ roles: listRoles() }); }
+      catch (e) { return Response.json({ error: (e as Error).message }, { status: 400 }); }
+    }
+    if (p === '/__fleet/new' && req.method === 'POST') {
+      try {
+        const b = (await req.json()) as { role?: string; slug?: string };
+        const out = spawnAgent(b.role || '', b.slug || '');
+        return Response.json({ ok: true, output: out });
       } catch (e) { return Response.json({ error: (e as Error).message }, { status: 400 }); }
     }
     if (p === '/__fleet/close' && req.method === 'POST') {
