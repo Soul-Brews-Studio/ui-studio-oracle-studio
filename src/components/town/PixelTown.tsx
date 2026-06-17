@@ -95,6 +95,8 @@ export function PixelTown({ state }: { state: FleetState }) {
     <div className="town-stage" style={{ width: stage.width, height: stage.height }}>
       <svg className="absolute inset-0 pointer-events-none" width={stage.width} height={stage.height}>
         {state.roads.map((r) => {
+          // skip roads inside one cluster (lead + workers already sit together)
+          if (stage.placements[r.from]?.home === stage.placements[r.to]?.home) return null;
           const a = centers(r.from), b = centers(r.to);
           if (!a || !b) return null;
           return <line key={`${r.from}>${r.to}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#c084fc" strokeOpacity={0.5} strokeWidth={2} className="town-road" />;
@@ -110,8 +112,8 @@ export function PixelTown({ state }: { state: FleetState }) {
       {stage.zones.map((z) => (
         <div key={z.id} className={`town-zone town-zone-${z.kind}`} style={{ left: z.x, top: z.y, width: z.w, height: z.h }}>
           <span className="town-zone-label">
-            {z.kind === 'hall' ? '🎩' : z.kind === 'plot' ? '🏠' : '·'} {z.label}
-            {z.kind === 'plot' && !z.known ? ' ~' : ''}
+            {z.kind === 'campaign' ? '🎩' : z.kind === 'team' ? '🏠' : '·'} {z.label}
+            {z.kind === 'team' && !z.known ? ' ~' : ''}
           </span>
         </div>
       ))}
@@ -134,6 +136,7 @@ export function PixelTown({ state }: { state: FleetState }) {
             }}
             title={`${a.windowName}\n${a.task || '—'}`}
           >
+            {a.isOrchestrator && <span className="town-crown">👑</span>}
             <span className="town-nametag" style={{ borderColor: cos.color }}>
               <b style={{ color: cos.color }}>{cos.title}</b>
               {a.label && a.label !== 'oracle' ? <span className="town-nametag-slug">·{a.label}</span> : null}

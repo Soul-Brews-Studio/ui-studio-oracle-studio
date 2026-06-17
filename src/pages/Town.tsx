@@ -1,13 +1,12 @@
 // Fleet Town — an ai-town-style live mirror of the tmux agent fleet.
-// Roles → costumes, working/asleep/offline → animation, teams → plots, and
-// orchestrators → a town hall with dispatch roads. Reflects reality; never drives it.
-import { useMemo, useRef, useState } from 'react';
+// Roles → costumes, working/asleep/offline → animation; an orchestrator and the
+// workers it dispatched (its maw campaign) sit together in one cluster. Map view =
+// pixel sprites on a grass map; List view = readable cards. Mirror, never drives.
+import { useMemo, useState } from 'react';
 import { useFleet } from '../lib/fleet';
-import type { FleetAgent } from '../lib/fleet';
 import { groupTown } from '../lib/town-group';
 import { costumeFor, KNOWN_ROLES } from '../lib/role-costume';
 import { District } from '../components/town/District';
-import { RoadLayer } from '../components/town/RoadLayer';
 import { PixelTown } from '../components/town/PixelTown';
 import './Town.css';
 
@@ -31,33 +30,7 @@ function ago(ts: number | null): string {
 export function Town() {
   const { state, loading, error, lastOk } = useFleet(2000);
   const districts = useMemo(() => groupTown(state), [state]);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const refs = useRef<Map<string, HTMLElement>>(new Map());
-  const [hoveredOrc, setHoveredOrc] = useState<string | null>(null);
   const [view, setView] = useState<TownView>('map');
-
-  const dispatchMap = useMemo(() => {
-    const byId = new Map(state.agents.map((a) => [a.id, a]));
-    const m = new Map<string, FleetAgent[]>();
-    for (const r of state.roads) {
-      const w = byId.get(r.to);
-      if (!w) continue;
-      const arr = m.get(r.from) ?? [];
-      arr.push(w);
-      m.set(r.from, arr);
-    }
-    return m;
-  }, [state]);
-
-  const registerRef = (id: string, el: HTMLElement | null) => {
-    if (el) refs.current.set(id, el);
-    else refs.current.delete(id);
-  };
-  const ringFor = (id: string): string | undefined => {
-    if (!hoveredOrc) return undefined;
-    if (id === hoveredOrc) return '#c084fc';
-    return dispatchMap.get(hoveredOrc)?.some((w) => w.id === id) ? '#c084fc' : undefined;
-  };
 
   const rolesPresent = useMemo(() => {
     const set = new Set(state.agents.map((a) => a.role));
@@ -106,7 +79,7 @@ export function Town() {
             );
           })}
           <span className="text-white/30">·</span>
-          <span className="text-white/40">⠂ spinner = working · ✳ = asleep · grey = offline · 🎩→ dispatch road</span>
+          <span className="text-white/40">👑 = orchestrator (grouped with its team) · ⠂ working · ✳ asleep · grey offline</span>
         </div>
       </header>
 
@@ -119,20 +92,8 @@ export function Town() {
       {view === 'map' && <PixelTown state={state} />}
 
       {view === 'list' && (
-        <div ref={containerRef} className="relative">
-          <RoadLayer roads={state.roads} container={containerRef} refs={refs} version={state.ts} />
-          <div className="relative z-10 flex flex-col gap-3">
-            {districts.map((d) => (
-              <District
-                key={d.session}
-                d={d}
-                registerRef={registerRef}
-                dispatchMap={dispatchMap}
-                setHoveredOrc={setHoveredOrc}
-                ringFor={ringFor}
-              />
-            ))}
-          </div>
+        <div className="flex flex-col gap-3">
+          {districts.map((d) => <District key={d.session} d={d} />)}
         </div>
       )}
 

@@ -1,25 +1,40 @@
-// A district = one tmux session. Renders the orchestrator "town hall" (with the
-// campaigns each dispatched), the team "plots" (count the plots = count the teams),
-// and the "commons" for un-teamed / home / offline panes.
-import type { FleetAgent } from '../../lib/fleet';
-import type { TownDistrict } from '../../lib/town-group';
+// A district = one tmux session. Renders its clusters: a campaign card groups an
+// orchestrator (lead, 👑) with the workers it dispatched; a team card is a
+// leaderless maw team; commons holds un-teamed / home / offline panes.
+import type { TownDistrict, TownCluster } from '../../lib/town-group';
 import { AgentTile } from './AgentTile';
 
-interface Props {
-  d: TownDistrict;
-  registerRef: (id: string, el: HTMLElement | null) => void;
-  dispatchMap: Map<string, FleetAgent[]>;
-  setHoveredOrc: (id: string | null) => void;
-  ringFor: (id: string) => string | undefined;
+function ClusterCard({ c }: { c: TownCluster }) {
+  const icon = c.kind === 'campaign' ? '🎩' : c.kind === 'team' ? '🏠' : null;
+  const count = (c.lead ? 1 : 0) + c.members.length;
+  const border = c.kind === 'campaign' ? 'rgba(192,132,252,0.45)' : c.kind === 'team' ? 'rgba(150,210,150,0.3)' : 'rgba(255,255,255,0.1)';
+  const style = c.kind === 'commons'
+    ? { borderColor: border, borderStyle: 'dotted' as const, background: 'rgba(255,255,255,0.015)' }
+    : { borderColor: border, borderStyle: c.kind === 'campaign' ? ('solid' as const) : ('dashed' as const), background: c.kind === 'campaign' ? 'rgba(192,132,252,0.05)' : 'rgba(120,200,120,0.04)' };
+  return (
+    <div className="rounded-lg border p-2" style={style}>
+      {c.kind !== 'commons' && (
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <span className="text-[11px] font-semibold text-white/75 truncate">{icon} {c.label}</span>
+          <span className="text-[9px] text-white/35 shrink-0">{count}</span>
+          {c.kind === 'team' && !c.known && <span className="text-[8px] text-white/25" title="inferred from shared slug">~</span>}
+        </div>
+      )}
+      <div className={c.kind === 'commons' ? 'flex flex-wrap gap-1.5' : 'flex flex-col gap-1.5'}>
+        {c.lead && <AgentTile agent={c.lead} ring="#c084fc" />}
+        {c.members.map((m) => <AgentTile key={m.id} agent={m} />)}
+      </div>
+    </div>
+  );
 }
 
-export function District({ d, registerRef, dispatchMap, setHoveredOrc, ringFor }: Props) {
+export function District({ d }: { d: TownDistrict }) {
   return (
     <section className="rounded-xl border border-white/[0.08] p-3" style={{ background: '#0c0c12' }}>
       <header className="flex items-center justify-between mb-2.5">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-[13px] font-semibold text-white/85 truncate">🏙 {d.session}</span>
-          <span className="text-[10px] text-white/40 shrink-0">{d.plots.length} team{d.plots.length !== 1 ? 's' : ''}</span>
+          <span className="text-[10px] text-white/40 shrink-0">{d.clusters.filter((c) => c.kind !== 'commons').length} groups</span>
         </div>
         <div className="flex items-center gap-2.5 text-[10px] text-white/45 shrink-0">
           <span title="working">🟢 {d.counts.working}</span>
@@ -27,66 +42,9 @@ export function District({ d, registerRef, dispatchMap, setHoveredOrc, ringFor }
           <span title="offline">⚪ {d.counts.offline}</span>
         </div>
       </header>
-
-      {d.halls.length > 0 && (
-        <div className="mb-3">
-          <div className="text-[10px] uppercase tracking-wider text-white/30 mb-1.5">🎩 town hall · dispatchers</div>
-          <div className="flex flex-wrap gap-2.5">
-            {d.halls.map((o) => {
-              const sent = dispatchMap.get(o.id) ?? [];
-              return (
-                <div key={o.id} onMouseEnter={() => setHoveredOrc(o.id)} onMouseLeave={() => setHoveredOrc(null)}>
-                  <AgentTile agent={o} registerRef={registerRef} ring={ringFor(o.id)} />
-                  {sent.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1 pl-1">
-                      {sent.map((w) => (
-                        <span key={w.id} className="text-[9px] font-mono rounded px-1 py-0.5" style={{ background: '#c084fc1f', color: '#c9a6f5' }}>
-                          ⇢ {w.label}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {d.plots.length > 0 && (
-        <div className="grid gap-2 mb-3" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))' }}>
-          {d.plots.map((p) => (
-            <div
-              key={p.name}
-              className="rounded-lg border border-dashed p-2"
-              style={{ borderColor: 'rgba(255,255,255,0.13)', background: 'rgba(255,255,255,0.015)' }}
-              title={p.description || undefined}
-            >
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <span className="text-[11px] font-semibold text-white/70 truncate">🏠 {p.name}</span>
-                <span className="text-[9px] text-white/35 shrink-0">{p.members.length}</span>
-                {!p.known && <span className="text-[8px] text-white/25 shrink-0" title="inferred from shared slug, not a maw team">~</span>}
-              </div>
-              <div className="flex flex-col gap-1.5">
-                {p.members.map((m) => (
-                  <AgentTile key={m.id} agent={m} registerRef={registerRef} ring={ringFor(m.id)} />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {d.commons.length > 0 && (
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-white/25 mb-1.5">commons</div>
-          <div className="flex flex-wrap gap-1.5">
-            {d.commons.map((m) => (
-              <AgentTile key={m.id} agent={m} registerRef={registerRef} ring={ringFor(m.id)} />
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(210px,1fr))' }}>
+        {d.clusters.map((c) => <ClusterCard key={c.key} c={c} />)}
+      </div>
     </section>
   );
 }

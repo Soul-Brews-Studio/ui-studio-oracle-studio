@@ -58,8 +58,8 @@
 .town-zone {
   position: absolute; border-radius: 7px; box-sizing: border-box;
 }
-.town-zone-plot { border: 3px dashed rgba(150,210,150,0.32); background: rgba(120,200,120,0.06); }
-.town-zone-hall { border: 3px solid rgba(192,132,252,0.45); background: rgba(192,132,252,0.08); }
+.town-zone-team { border: 3px dashed rgba(150,210,150,0.32); background: rgba(120,200,120,0.06); }
+.town-zone-campaign { border: 3px solid rgba(192,132,252,0.5); background: rgba(192,132,252,0.09); }
 .town-zone-commons { border: 2px dotted rgba(255,255,255,0.14); background: rgba(255,255,255,0.02); }
 .town-zone-label {
   position: absolute; top: 3px; left: 7px; font-size: 11px; font-weight: 600;
@@ -82,4 +82,8 @@
 .town-zzz-pixel {
   position: absolute; top: -16px; right: 2px;
   color: rgba(255,255,255,0.65); font-size: 12px; font-weight: 700; pointer-events: none;
+}
+.town-crown {
+  position: absolute; top: -26px; left: 50%; transform: translateX(-50%);
+  font-size: 13px; pointer-events: none; filter: drop-shadow(0 1px 2px #000);
 }

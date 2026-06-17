@@ -1,13 +1,15 @@
 // Pure layout: districts → absolutely-positioned pixel "zones" on the town map,
-// and a home rect per agent (the area its sprite wanders within). District = tmux
-// session; zones = orchestrator Town Hall, each team plot, and the commons.
+// and a home rect per agent (the area its sprite wanders within). One zone per
+// cluster: a campaign (orchestrator + its workers, together), a leaderless maw
+// team, or the commons. District = tmux session.
 import type { TownDistrict } from './town-group';
 
 export interface StageZone {
   id: string;
-  kind: 'hall' | 'plot' | 'commons';
+  kind: 'campaign' | 'team' | 'commons';
   label: string;
   known?: boolean;
+  leadId?: string;
   session: string;
   x: number; y: number; w: number; h: number;
   agentIds: string[];
@@ -21,16 +23,16 @@ export interface Stage {
   placements: Record<string, Placement>;
 }
 
-const CELL = 80;      // screen room per sprite (64px sprite + name-tag)
-const PAD = 16;       // zone inner padding
-const LABEL_H = 20;   // zone label strip
+const CELL = 80;
+const PAD = 16;
+const LABEL_H = 20;
 const GAP = 18;
 const STAGE_W = 1180;
 const HEADER_H = 30;
 
 function zoneSize(n: number) {
-  const cols = Math.max(1, Math.min(n, Math.ceil(Math.sqrt(n * 1.7))));
-  const rows = Math.ceil(n / cols);
+  const cols = Math.max(1, Math.min(Math.max(n, 1), Math.ceil(Math.sqrt(Math.max(n, 1) * 1.7))));
+  const rows = Math.ceil(Math.max(n, 1) / cols);
   return { w: cols * CELL + PAD * 2, h: rows * CELL + PAD * 2 + LABEL_H };
 }
 
@@ -44,18 +46,15 @@ export function buildStage(districts: TownDistrict[]): Stage {
     headers.push({ session: d.session, label: d.session, y, counts: d.counts });
     y += HEADER_H;
 
-    const defs: Array<{ kind: StageZone['kind']; label: string; known?: boolean; ids: string[] }> = [];
-    if (d.halls.length) defs.push({ kind: 'hall', label: 'Town Hall', ids: d.halls.map((a) => a.id) });
-    for (const p of d.plots) defs.push({ kind: 'plot', label: p.name, known: p.known, ids: p.members.map((m) => m.id) });
-    if (d.commons.length) defs.push({ kind: 'commons', label: 'commons', ids: d.commons.map((a) => a.id) });
-
     let x = 8, rowH = 0;
-    for (const z of defs) {
-      const sz = zoneSize(z.ids.length);
+    for (const c of d.clusters) {
+      const ids = c.lead ? [c.lead.id, ...c.members.map((m) => m.id)] : c.members.map((m) => m.id);
+      if (!ids.length) continue;
+      const sz = zoneSize(ids.length);
       if (x + sz.w > STAGE_W && x > 8) { x = 8; y += rowH + GAP; rowH = 0; }
-      zones.push({ id: `${d.session}|${z.kind}|${z.label}`, kind: z.kind, label: z.label, known: z.known, session: d.session, x, y, w: sz.w, h: sz.h, agentIds: z.ids });
+      zones.push({ id: c.key, kind: c.kind, label: c.label, known: c.known, leadId: c.lead?.id, session: d.session, x, y, w: sz.w, h: sz.h, agentIds: ids });
       const home = { x: x + PAD, y: y + PAD + LABEL_H, w: sz.w - PAD * 2, h: sz.h - PAD * 2 - LABEL_H };
-      for (const id of z.ids) placements[id] = { home };
+      for (const id of ids) placements[id] = { home };
       x += sz.w + GAP;
       rowH = Math.max(rowH, sz.h);
     }
