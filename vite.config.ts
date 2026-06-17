@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { execSync } from 'child_process'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
+import { fleetTownPlugin } from './server/fleet-plugin'
 
 // Get version and git info
 const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'))
@@ -14,7 +15,7 @@ const gitHash = (() => {
 const appVersion = `v${pkg.version}+${gitHash}`
 
 export default defineConfig({
-  plugins: [tailwindcss(), react()],
+  plugins: [tailwindcss(), react(), fleetTownPlugin()],
   define: {
     __APP_VERSION__: JSON.stringify(appVersion)
   },

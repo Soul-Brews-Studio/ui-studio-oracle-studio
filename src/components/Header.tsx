@@ -14,6 +14,7 @@ const FALLBACK_NAV: NavItem[] = [
   { path: '/search', label: 'Search' },
   { path: '/forum', label: 'Forum' },
   { path: '/pulse', label: 'Pulse' },
+  { path: '/town', label: 'Town' },
   { path: '/sessions', label: 'Sessions' },
   { path: '/plugins', label: 'Plugins' },
   { path: '/activity?tab=searches', label: 'Activity' },

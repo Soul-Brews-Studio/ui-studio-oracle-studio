@@ -1,0 +1,36 @@
+/* Fleet Town animations — "working" agents walk, "asleep" agents drift a zzz,
+   dispatch roads have a marching-ants dash. Kept tiny + class-driven. */
+
+@keyframes town-walk {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50%      { transform: translateY(-3px) rotate(2deg); }
+}
+
+@keyframes town-zzz {
+  0%   { opacity: 0;   transform: translateY(2px) scale(0.8); }
+  40%  { opacity: 0.8; }
+  100% { opacity: 0;   transform: translateY(-9px) scale(1.1); }
+}
+
+@keyframes town-dash {
+  to { stroke-dashoffset: -18; }
+}
+
+.town-working .town-avatar {
+  animation: town-walk 0.9s ease-in-out infinite;
+}
+
+.town-zzz {
+  animation: town-zzz 2.4s ease-in-out infinite;
+}
+
+.town-road {
+  stroke-dasharray: 5 4;
+  animation: town-dash 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .town-working .town-avatar,
+  .town-zzz,
+  .town-road { animation: none; }
+}
