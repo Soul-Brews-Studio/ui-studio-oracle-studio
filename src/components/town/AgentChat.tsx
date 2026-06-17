@@ -10,7 +10,7 @@ const NAV_KEYS: Array<[string, string]> = [['↑', 'up'], ['↓', 'down'], ['←
 type Tab = 'history' | 'live';
 
 export function AgentChat({ agent, onClose }: { agent: FleetAgent; onClose: () => void }) {
-  const [tab, setTab] = useState<Tab>('history');
+  const [tab, setTab] = useState<Tab>('live');
   const [text, setText] = useState('');
   const [input, setInput] = useState('');
   const [err, setErr] = useState<string | null>(null);
