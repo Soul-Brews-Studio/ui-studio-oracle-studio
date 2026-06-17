@@ -71,8 +71,9 @@ export async function fetchFleet(signal?: AbortSignal): Promise<FleetState> {
 // Agent text-session endpoints (same-origin, outside /api like FLEET_ENDPOINT).
 export const PANE_ENDPOINT = '/__fleet/pane';
 export const SEND_ENDPOINT = '/__fleet/send';
+export const TRANSCRIPT_ENDPOINT = '/__fleet/transcript';
 
-/** Capture a pane's rendered text (the agent's live terminal session). */
+/** Capture a pane's rendered text (the agent's live terminal screen). */
 export async function capturePane(paneId: string, signal?: AbortSignal): Promise<string> {
   const res = await fetch(`${PANE_ENDPOINT}?id=${encodeURIComponent(paneId)}`, { signal });
   const j = await res.json();
@@ -80,15 +81,45 @@ export async function capturePane(paneId: string, signal?: AbortSignal): Promise
   return j.text as string;
 }
 
+/** Full conversation history from the agent's session transcript (deep scrollback). */
+export async function fetchTranscript(paneId: string, signal?: AbortSignal): Promise<string> {
+  const res = await fetch(`${TRANSCRIPT_ENDPOINT}?id=${encodeURIComponent(paneId)}`, { signal });
+  const j = await res.json();
+  if (!res.ok || j.error) throw new Error(j.error || `transcript ${res.status}`);
+  return j.text as string;
+}
+
 /** Type a line into the agent's pane and submit it (Enter). */
 export async function sendToPane(paneId: string, text: string): Promise<void> {
+  await postSend({ id: paneId, text });
+}
+
+/** Send a single named navigation key (up/down/left/right/enter/esc/tab) for a TUI menu. */
+export async function sendKeyToPane(paneId: string, key: string): Promise<void> {
+  await postSend({ id: paneId, key });
+}
+
+async function postSend(body: { id: string; text?: string; key?: string }): Promise<void> {
   const res = await fetch(SEND_ENDPOINT, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ id: paneId, text }),
+    body: JSON.stringify(body),
   });
   const j = await res.json().catch(() => ({}));
   if (!res.ok || j.error) throw new Error(j.error || `send ${res.status}`);
+}
+
+export const CLOSE_ENDPOINT = '/__fleet/close';
+
+/** Close the agent's session (kills its tmux pane — brewbot /close). Destructive. */
+export async function closePaneSession(paneId: string): Promise<void> {
+  const res = await fetch(CLOSE_ENDPOINT, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ id: paneId }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok || j.error) throw new Error(j.error || `close ${res.status}`);
 }
 
 export interface UseFleet {

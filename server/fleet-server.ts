@@ -12,7 +12,8 @@
 import { join, normalize } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
 import { getFleetState } from './fleet-probe';
-import { capturePane, sendToPane } from './pane-io';
+import { capturePane, sendToPane, sendKey, closePane } from './pane-io';
+import { transcriptFor } from './transcript';
 
 const DIST = join(import.meta.dir, '..', 'dist');
 const PORT = Number(process.env.FLEET_PORT || 8788);
@@ -48,13 +49,27 @@ const server = Bun.serve({
     }
 
     if (p === '/__fleet/pane') {
-      try { return Response.json({ text: capturePane(url.searchParams.get('id') || '') }); }
+      try {
+        const lines = Number(url.searchParams.get('lines')) || undefined;
+        return Response.json({ text: capturePane(url.searchParams.get('id') || '', lines) });
+      } catch (e) { return Response.json({ error: (e as Error).message }, { status: 400 }); }
+    }
+    if (p === '/__fleet/transcript') {
+      try { return Response.json({ text: transcriptFor(url.searchParams.get('id') || '') }); }
       catch (e) { return Response.json({ error: (e as Error).message }, { status: 400 }); }
     }
     if (p === '/__fleet/send' && req.method === 'POST') {
       try {
-        const b = (await req.json()) as { id?: string; text?: string };
-        sendToPane(b.id || '', b.text || '');
+        const b = (await req.json()) as { id?: string; text?: string; key?: string };
+        if (b.key) sendKey(b.id || '', b.key);
+        else sendToPane(b.id || '', b.text || '');
+        return Response.json({ ok: true });
+      } catch (e) { return Response.json({ error: (e as Error).message }, { status: 400 }); }
+    }
+    if (p === '/__fleet/close' && req.method === 'POST') {
+      try {
+        const b = (await req.json()) as { id?: string };
+        closePane(b.id || '');
         return Response.json({ ok: true });
       } catch (e) { return Response.json({ error: (e as Error).message }, { status: 400 }); }
     }

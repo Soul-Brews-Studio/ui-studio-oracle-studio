@@ -10,7 +10,8 @@
 import type { Plugin } from 'vite';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { getFleetState } from './fleet-probe';
-import { capturePane, sendToPane } from './pane-io';
+import { capturePane, sendToPane, sendKey, closePane } from './pane-io';
+import { transcriptFor } from './transcript';
 
 const json = (res: ServerResponse, body: unknown, status = 200) => {
   res.statusCode = status;
@@ -38,16 +39,27 @@ export function fleetTownPlugin(): Plugin {
       });
       server.middlewares.use('/__fleet/pane', (req, res) => {
         try {
+          const q = new URL(req.url || '', 'http://x').searchParams;
+          json(res, { text: capturePane(q.get('id') || '', Number(q.get('lines')) || undefined) });
+        } catch (e) { json(res, { error: (e as Error).message }, 400); }
+      });
+      server.middlewares.use('/__fleet/transcript', (req, res) => {
+        try {
           const id = new URL(req.url || '', 'http://x').searchParams.get('id') || '';
-          json(res, { text: capturePane(id) });
+          json(res, { text: transcriptFor(id) });
         } catch (e) { json(res, { error: (e as Error).message }, 400); }
       });
       server.middlewares.use('/__fleet/send', async (req, res) => {
         try {
           const b = JSON.parse((await readBody(req)) || '{}');
-          sendToPane(b.id || '', b.text || '');
+          if (b.key) sendKey(b.id || '', b.key);
+          else sendToPane(b.id || '', b.text || '');
           json(res, { ok: true });
         } catch (e) { json(res, { error: (e as Error).message }, 400); }
+      });
+      server.middlewares.use('/__fleet/close', async (req, res) => {
+        try { const b = JSON.parse((await readBody(req)) || '{}'); closePane(b.id || ''); json(res, { ok: true }); }
+        catch (e) { json(res, { error: (e as Error).message }, 400); }
       });
     },
   };

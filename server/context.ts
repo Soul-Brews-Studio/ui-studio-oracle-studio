@@ -13,7 +13,7 @@ const encode = (cwd: string) => cwd.replace(/[/.]/g, '-');
 export interface CtxResult { pct: number; tokens: number; ctxMax: number; model: string }
 const cache = new Map<string, { mtimeMs: number; res: CtxResult | null }>();
 
-function newestJsonl(cwd: string): string | null {
+export function newestJsonl(cwd: string): string | null {
   const dir = join(PROJECTS, encode(cwd));
   let best: { path: string; m: number } | null = null;
   try {

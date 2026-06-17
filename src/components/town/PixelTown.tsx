@@ -58,9 +58,13 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
         pickTarget(act);
         actors.current.set(a.id, act);
       } else {
+        // Zones rebuild every poll; only re-target when the rect VALUE changed,
+        // else a stale target may sit outside the new home and pin the sprite to a wall.
+        const moved = act.home.x !== home.x || act.home.y !== home.y || act.home.w !== home.w || act.home.h !== home.h;
         act.status = a.status; act.home = home; act.charIndex = charIndexFor(a.role);
-        act.x = clamp(act.x, home.x, home.x + home.w - SPRITE);
-        act.y = clamp(act.y, home.y, home.y + home.h - SPRITE);
+        act.x = clamp(act.x, home.x, home.x + Math.max(0, home.w - SPRITE));
+        act.y = clamp(act.y, home.y, home.y + Math.max(0, home.h - SPRITE));
+        if (moved) pickTarget(act);
       }
     }
     for (const id of [...actors.current.keys()]) if (!live.has(id)) { actors.current.delete(id); els.current.delete(id); }
@@ -82,10 +86,17 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
             if (dist < 2) pickTarget(act);
             else {
               const sp = 0.035 * dt;
-              act.x += (dx / dist) * sp; act.y += (dy / dist) * sp;
+              const nx = act.x + (dx / dist) * sp;
+              const ny = act.y + (dy / dist) * sp;
+              const maxX = act.home.x + Math.max(0, act.home.w - SPRITE);
+              const maxY = act.home.y + Math.max(0, act.home.h - SPRITE);
+              const cx = clamp(nx, act.home.x, maxX);
+              const cy = clamp(ny, act.home.y, maxY);
               act.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 1 : 2) : (dy < 0 ? 3 : 0);
               act.frameT += dt;
               if (act.frameT > 150) { act.frameT = 0; act.frame = (act.frame + 1) % 3; }
+              act.x = cx; act.y = cy;
+              if (cx !== nx || cy !== ny) pickTarget(act); // hit a wall → turn around
             }
           }
           el.style.backgroundPosition = bgPos(act.charIndex, act.dir, act.frame);
