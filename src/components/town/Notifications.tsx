@@ -24,7 +24,7 @@ function b64ToU8(base64: string): Uint8Array {
 const loadPrefs = (): Prefs => { try { return { ...DEFAULT, ...JSON.parse(localStorage.getItem(LS) || '{}') }; } catch { return DEFAULT; } };
 const post = (path: string, body: object) => fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
-export function Notifications({ teams, agents }: { teams: string[]; agents: { id: string; name: string }[] }) {
+export function Notifications({ teams, agents }: { teams: { key: string; name: string }[]; agents: { id: string; name: string }[] }) {
   const [open, setOpen] = useState(false);
   const [endpoint, setEndpoint] = useState<string | null>(null);
   const [perm, setPerm] = useState<NotificationPermission>(supported ? Notification.permission : 'denied');
@@ -131,7 +131,7 @@ export function Notifications({ teams, agents }: { teams: string[]; agents: { id
             {supported && on && (
               <>
                 <Section title="💤 Team idle" master={prefs.teamIdle} onMaster={(v) => syncPrefs({ ...prefs, teamIdle: v })}
-                  items={teams.map((t) => ({ key: t, name: t }))} off={prefs.teamsOff} onToggle={(k) => toggleIn('teamsOff', k)} empty="no active teams" />
+                  items={teams} off={prefs.teamsOff} onToggle={(k) => toggleIn('teamsOff', k)} empty="no active teams" />
                 <Section title="🔔 Needs input" master={prefs.waiting} onMaster={(v) => syncPrefs({ ...prefs, waiting: v })}
                   items={agents} off={prefs.agentsOff} onToggle={(k) => toggleIn('agentsOff', k)} empty="no agents" />
                 <div className="mt-2 flex gap-2 border-t border-white/10 pt-2">

@@ -11,6 +11,8 @@ import webpush from 'web-push';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { groupTown } from '../src/lib/town-group';
+import type { FleetState } from '../src/lib/fleet';
 
 const DIR = join(homedir(), '.fleet-town');
 const VAPID_FILE = join(DIR, 'vapid.json');
@@ -89,53 +91,53 @@ export async function handlePush(req: Request, p: string): Promise<Response | nu
 }
 
 // ---- detection loop ----
-type Agent = { id: string; status: string; waiting?: boolean; team?: string | null; role?: string; label?: string };
-type State = { agents: Agent[] };
-
 let prevIdleTeams = new Set<string>();
 let prevWaiting = new Set<string>();
 
-function idleTeams(agents: Agent[]): Map<string, true> {
-  const groups = new Map<string, Agent[]>();
-  for (const a of agents) {
-    if (!a.team) continue;
-    let arr = groups.get(a.team);
-    if (!arr) { arr = []; groups.set(a.team, arr); }
-    arr.push(a);
-  }
-  const out = new Map<string, true>();
-  for (const [team, members] of groups) {
-    if (members.length > 0 && members.every((m) => m.status === 'idle')) out.set(team, true);
+const named = (a: { role?: string; label?: string }) =>
+  `${a.role || 'orchestrator'}${a.label && a.label !== 'oracle' ? '·' + a.label : ''}`;
+
+// Campaign/team clusters (per town-group) that are FULLY idle. A "team" is the
+// orchestrator-led cluster — keyed by cluster key and named by its orchestrator,
+// NOT a bare maw-team name (owner: the team == the orchestrator that leads it).
+function idleClusters(state: FleetState): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const d of groupTown(state)) {
+    for (const c of d.clusters) {
+      if (c.kind === 'commons') continue;
+      const members = c.lead ? [c.lead, ...c.members] : c.members;
+      if (members.length > 0 && members.every((m) => m.status === 'idle')) {
+        out.set(c.key, c.lead ? named(c.lead) : c.label);
+      }
+    }
   }
   return out;
 }
 
-async function tick(getState: () => Promise<State>) {
-  let state: State;
+async function tick(getState: () => Promise<FleetState>) {
+  let state: FleetState;
   try { state = await getState(); } catch { return; }
-  const agents = state.agents || [];
 
-  const idle = idleTeams(agents);
-  for (const team of idle.keys()) {
-    if (prevIdleTeams.has(team)) continue;                       // already alerted
-    for (const s of subs) if (s.prefs.teamIdle && !s.prefs.teamsOff.includes(team)) {
-      void send(s, { title: '💤 Team idle', body: `${team} — every agent is asleep`, tag: `team-${team}`, renotify: true });
+  const idle = idleClusters(state);
+  for (const [key, name] of idle) {
+    if (prevIdleTeams.has(key)) continue;                        // already alerted
+    for (const s of subs) if (s.prefs.teamIdle && !s.prefs.teamsOff.includes(key)) {
+      void send(s, { title: '💤 Team idle', body: `${name} — every agent is asleep`, tag: `team-${key}`, renotify: true });
     }
   }
   prevIdleTeams = new Set(idle.keys());
 
   const waitingNow = new Set<string>();
-  for (const a of agents) if (a.waiting) {
+  for (const a of state.agents) if (a.waiting) {
     waitingNow.add(a.id);
     if (prevWaiting.has(a.id)) continue;
-    const who = `${a.role || 'agent'}${a.label && a.label !== 'oracle' ? '·' + a.label : ''}`;
     for (const s of subs) if (s.prefs.waiting && !(s.prefs.agentsOff || []).includes(a.id)) {
-      void send(s, { title: '🔔 Needs your input', body: `${who} is waiting at a menu`, tag: `wait-${a.id}`, url: '/town', sticky: true });
+      void send(s, { title: '🔔 Needs your input', body: `${named(a)} is waiting at a menu`, tag: `wait-${a.id}`, url: '/town', sticky: true });
     }
   }
   prevWaiting = waitingNow;
 }
 
-export function startNotifyLoop(getState: () => Promise<State>, ms = 8000) {
+export function startNotifyLoop(getState: () => Promise<FleetState>, ms = 8000) {
   setInterval(() => void tick(getState), ms);
 }
