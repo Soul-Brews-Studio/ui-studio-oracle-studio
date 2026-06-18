@@ -43,17 +43,20 @@ export function closePane(id: string): void {
   execFileSync('tmux', ['kill-pane', '-t', id]);
 }
 
-// A TUI selection menu (AskUserQuestion / numbered choices) is up and blocking on a
-// human answer — the strongest signals are the cursored option and the menu footer
-// (matches brewbot pane-classify.sh's `menu` state). The fleet runs with
-// --dangerously-skip-permissions, so the menu prompt is the live "needs you" case.
-const MENU_RE = [/^[ \t]*❯[ \t]*\d+[.)]/m, /Enter to select|↑\/↓ to navigate|to select ·/i];
+// A live TUI selection menu (AskUserQuestion / numbered choices) blocking on a human
+// answer — signalled by the CURSORED option (❯ on a numbered line, brewbot's
+// CLAUDE_MENU_RE) or the full menu footer. Scanned ONLY in the bottom region (the
+// active menu sits just above the input box); menu-like text in the conversation /
+// scrollback above must NOT trip it — else a session merely *writing about* menus
+// (e.g. this feature's own code) flags itself (the brewbot 2026-06-17 self-watch FP).
+const MENU_RE = [/^[ \t]*❯[ \t]*\d+[.)]/m, /Enter to select[^\n]{0,40}(navigate|cancel)/i];
 
 /** True when the pane is parked on a menu waiting for our input. Cheap (visible screen). */
 export function paneNeedsInput(id: string): boolean {
   if (!validPane(id)) return false;
   try {
     const t = execFileSync('tmux', ['capture-pane', '-p', '-t', id], { encoding: 'utf8', maxBuffer: 2_000_000 });
-    return MENU_RE.some((re) => re.test(t));
+    const bottom = t.split('\n').filter((l) => l.trim()).slice(-10).join('\n');
+    return MENU_RE.some((re) => re.test(bottom));
   } catch { return false; }
 }
