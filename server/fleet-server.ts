@@ -15,6 +15,7 @@ import { getFleetState } from './fleet-probe';
 import { capturePane, sendToPane, sendKey, closePane } from './pane-io';
 import { transcriptFor } from './transcript';
 import { listRoles, spawnAgent } from './agents';
+import { handlePush, startNotifyLoop } from './push';
 
 const DIST = join(import.meta.dir, '..', 'dist');
 const PORT = Number(process.env.FLEET_PORT || 8788);
@@ -27,7 +28,9 @@ const API_ALLOW = new Set(['/api/health', '/api/auth/status']);
 // localStorage with the page origin BEFORE the app bundle evaluates so /api resolves
 // same-origin → our forwarded /api/health passes the gate (the rest of /api stays 404'd).
 const SEED = `<script>try{var k='oracle-studio-host';if(!localStorage.getItem(k))localStorage.setItem(k,location.origin);}catch(e){}</script>`;
-const INDEX_HTML = (await Bun.file(join(DIST, 'index.html')).text()).replace('<head>', '<head>' + SEED);
+// PWA: make /town installable + register the service worker (push display).
+const PWA = `<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#6a7a30"><link rel="apple-touch-icon" href="/icon-192.png"><script>if('serviceWorker'in navigator){addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){})})}</script>`;
+const INDEX_HTML = (await Bun.file(join(DIST, 'index.html')).text()).replace('<head>', '<head>' + SEED + PWA);
 
 const EMPTY = {
   ts: '', host: '', agents: [], teams: [], roads: [],
@@ -40,6 +43,13 @@ const server = Bun.serve({
   async fetch(req) {
     const url = new URL(req.url);
     const p = url.pathname;
+
+    if (p.startsWith('/__fleet/push/')) {
+      try {
+        const r = await handlePush(req, p);
+        if (r) return r;
+      } catch (e) { return Response.json({ error: (e as Error).message }, { status: 400 }); }
+    }
 
     if (p === '/__fleet/state') {
       try {
@@ -105,3 +115,6 @@ const server = Bun.serve({
 });
 
 console.log(`fleet-server listening on http://${server.hostname}:${server.port} (dist=${DIST})`);
+
+// Watch the fleet and push notifications (team-idle / agent-waiting) to PWA subscribers.
+startNotifyLoop(() => getFleetState());
