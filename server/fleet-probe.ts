@@ -55,19 +55,16 @@ function taskText(title: string, glyph: string): string {
 /** Team names backed by ~/.claude/teams/<name>/config.json (with descriptions). */
 interface TeamMeta { description: string; createdByPane?: string }
 interface PaneRole { role: string; team: string }
-interface OpenSlot { team: string; role: string }
 
 /**
  * Read team configs → (a) per-team meta, (b) a pane→role map from each member's
- * `tmuxPaneId` (authoritative role signal — maw can split many agents into ONE
- * window so the window-name prefix mislabels them as the lead), and (c) "open
- * slots": active members maw registered WITHOUT a tmuxPaneId (the separate-window
- * teammates whose pane it never recorded) — used to rescue them from the commons.
+ * `tmuxPaneId`. The pane map is the authoritative role+team signal: maw can split
+ * many agents into ONE window (orchestrator + spawned workers), so the window-name
+ * prefix mislabels them all as the lead — the member's recorded pane fixes that.
  */
-function readTeams(): { meta: Map<string, TeamMeta>; paneRole: Map<string, PaneRole>; openSlots: OpenSlot[] } {
+function readTeams(): { meta: Map<string, TeamMeta>; paneRole: Map<string, PaneRole> } {
   const meta = new Map<string, TeamMeta>();
   const paneRole = new Map<string, PaneRole>();
-  const openSlots: OpenSlot[] = [];
   try {
     for (const dir of readdirSync(TEAMS_DIR)) {
       const cfg = join(TEAMS_DIR, dir, 'config.json');
@@ -78,14 +75,13 @@ function readTeams(): { meta: Map<string, TeamMeta>; paneRole: Map<string, PaneR
           description: typeof j?.description === 'string' ? j.description : '',
           createdByPane: typeof j?.createdByPane === 'string' && j.createdByPane ? j.createdByPane : undefined,
         });
-        for (const m of (j?.members ?? []) as Array<{ name?: string; tmuxPaneId?: string; isActive?: boolean }>) {
+        for (const m of (j?.members ?? []) as Array<{ name?: string; tmuxPaneId?: string }>) {
           if (m?.tmuxPaneId && m?.name) paneRole.set(m.tmuxPaneId, { role: m.name, team: dir });
-          else if (m?.name && m.isActive && !m.tmuxPaneId) openSlots.push({ team: dir, role: m.name });
         }
       } catch { /* skip malformed */ }
     }
   } catch { /* no teams dir */ }
-  return { meta, paneRole, openSlots };
+  return { meta, paneRole };
 }
 
 const norm = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -96,7 +92,7 @@ function readPanes(): string[][] {
 }
 
 export async function getFleetState(): Promise<FleetState> {
-  const { meta: known, paneRole, openSlots } = readTeams();
+  const { meta: known, paneRole } = readTeams();
   const rows = readPanes();
 
   // First pass → agents (team assignment needs slug frequencies, computed below).
@@ -163,33 +159,6 @@ export async function getFleetState(): Promise<FleetState> {
     const owner = ownerId && agents.find((a) => a.id === ownerId);
     if (!owner || !owner.isOrchestrator) continue;
     for (const m of agents) if (m.team === name) addRoad(owner.id, m.id);
-  }
-
-  // Rescue separately-windowed teammates maw left without a tmuxPaneId: a commons
-  // worker fills an "open slot" (active member, no pane) of a team whose creator is
-  // a LIVE orchestrator. Only when that role's open slots are in ONE such team
-  // (no ambiguity) — else leave it in commons. (e.g. next-dev-l1g → team 20-live-bbot.)
-  const liveOpen = openSlots.filter((s) => {
-    const ownerId = idByPane.get(known.get(s.team)?.createdByPane || '');
-    return ownerId && agents.some((a) => a.id === ownerId && a.isOrchestrator);
-  });
-  const teamsByRole = new Map<string, Set<string>>();
-  for (const s of liveOpen) {
-    const role = parseWindow(s.role).role;
-    (teamsByRole.get(role) ?? teamsByRole.set(role, new Set()).get(role)!).add(s.team);
-  }
-  for (const [role, teamSet] of teamsByRole) {
-    if (teamSet.size !== 1) continue; // ambiguous across campaigns → stay in commons
-    const team = [...teamSet][0];
-    const ownerId = idByPane.get(known.get(team)!.createdByPane!)!;
-    let slots = liveOpen.filter((s) => parseWindow(s.role).role === role && s.team === team).length;
-    for (const a of agents) {
-      if (slots <= 0) break;
-      if (a.team || a.isOrchestrator || a.role !== role || a.label === 'oracle') continue;
-      a.team = team;
-      addRoad(ownerId, a.id);
-      slots--;
-    }
   }
 
   // Teams (only those with ≥1 live member render — dead maw teams are skipped).
