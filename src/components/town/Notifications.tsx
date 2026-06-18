@@ -1,10 +1,10 @@
-// Push-notification controls for Fleet Town. Lets you install the PWA's push
-// subscription and toggle two alerts — whole-team-idle (per team) and an agent
-// waiting for input — delivered by the fleet-server even when the app is closed.
+// Push-notification controls for Fleet Town. Installs the PWA push subscription
+// and toggles two alerts, delivered by the fleet-server even when the app is
+// closed: whole-team-idle (per team) and an agent waiting for input (per agent).
 import { useEffect, useState } from 'react';
 
-interface Prefs { teamIdle: boolean; waiting: boolean; teamsOff: string[] }
-const DEFAULT: Prefs = { teamIdle: true, waiting: true, teamsOff: [] };
+interface Prefs { teamIdle: boolean; waiting: boolean; teamsOff: string[]; agentsOff: string[] }
+const DEFAULT: Prefs = { teamIdle: true, waiting: true, teamsOff: [], agentsOff: [] };
 const LS = 'fleet-notif-prefs';
 
 const hasWin = typeof window !== 'undefined';
@@ -24,7 +24,7 @@ function b64ToU8(base64: string): Uint8Array {
 const loadPrefs = (): Prefs => { try { return { ...DEFAULT, ...JSON.parse(localStorage.getItem(LS) || '{}') }; } catch { return DEFAULT; } };
 const post = (path: string, body: object) => fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
-export function Notifications({ teams }: { teams: string[] }) {
+export function Notifications({ teams, agents }: { teams: string[]; agents: { id: string; name: string }[] }) {
   const [open, setOpen] = useState(false);
   const [endpoint, setEndpoint] = useState<string | null>(null);
   const [perm, setPerm] = useState<NotificationPermission>(supported ? Notification.permission : 'denied');
@@ -32,16 +32,6 @@ export function Notifications({ teams }: { teams: string[] }) {
   const [busy, setBusy] = useState(false);
   const [testMsg, setTestMsg] = useState('');
 
-  async function sendTest() {
-    if (!endpoint) return;
-    setTestMsg('sending…');
-    try {
-      const r = await post('/__fleet/push/test', { endpoint }).then((x) => x.json());
-      setTestMsg(r.ok ? `server sent ✓ (FCM ${r.statusCode}) — if no popup, check OS/Chrome notification settings` : `error: ${r.statusCode || ''} ${r.error || ''}`);
-    } catch { setTestMsg('request failed'); }
-  }
-
-  // Reflect an already-installed subscription on load.
   useEffect(() => {
     if (!supported) return;
     navigator.serviceWorker.ready.then((reg) => reg.pushManager.getSubscription())
@@ -52,6 +42,11 @@ export function Notifications({ teams }: { teams: string[] }) {
     setPrefs(next);
     localStorage.setItem(LS, JSON.stringify(next));
     if (endpoint) void post('/__fleet/push/prefs', { endpoint, prefs: next });
+  };
+  const toggleIn = (list: 'teamsOff' | 'agentsOff', key: string) => {
+    const cur = prefs[list];
+    const next = cur.includes(key) ? cur.filter((x) => x !== key) : [...cur, key];
+    syncPrefs({ ...prefs, [list]: next });
   };
 
   async function enable() {
@@ -69,9 +64,7 @@ export function Notifications({ teams }: { teams: string[] }) {
     } catch (e) { console.error('push enable failed', e); }
     finally { setBusy(false); }
   }
-
   async function disable() {
-    if (!supported) return;
     setBusy(true);
     try {
       const reg = await navigator.serviceWorker.ready;
@@ -81,81 +74,106 @@ export function Notifications({ teams }: { teams: string[] }) {
     } catch (e) { console.error('push disable failed', e); }
     finally { setBusy(false); }
   }
+  async function sendTest() {
+    if (!endpoint) return;
+    setTestMsg('sending…');
+    try {
+      const r = await post('/__fleet/push/test', { endpoint }).then((x) => x.json());
+      setTestMsg(r.ok ? `server sent ✓ (FCM ${r.statusCode}) — no popup? check OS / browser notification settings` : `error: ${r.statusCode || ''} ${r.error || ''}`);
+    } catch { setTestMsg('request failed'); }
+  }
 
   const on = !!endpoint && perm === 'granted';
-  const toggleTeam = (t: string) => {
-    const off = prefs.teamsOff.includes(t) ? prefs.teamsOff.filter((x) => x !== t) : [...prefs.teamsOff, t];
-    syncPrefs({ ...prefs, teamsOff: off });
+  // Mobile-safe: fixed to the viewport so it never overflows off-screen on iOS.
+  const panel: React.CSSProperties = {
+    position: 'fixed', top: 52, right: 8, zIndex: 60,
+    width: 'min(320px, calc(100vw - 16px))', maxHeight: 'calc(100vh - 72px)', overflowY: 'auto',
   };
 
   return (
-    <div className="relative">
+    <div className="inline-block">
       <button onClick={() => setOpen((o) => !o)} className="px-2.5 py-1 rounded-full text-[11px]"
         style={{ background: on ? '#38bdf822' : 'transparent', color: on ? '#7dd3fc' : '#888', border: '1px solid rgba(255,255,255,0.1)' }}
         title="Notifications">🔔{on ? '' : '·'}</button>
 
       {open && (
-        <div className="absolute right-0 mt-1 z-50 w-64 rounded-xl border border-white/10 bg-[#10141a] p-3 text-[12px] text-white/80 shadow-2xl">
-          {!supported && (
-            <div className="space-y-1 text-white/70">
-              <p className="font-semibold text-white/90">Push isn't available in this view.</p>
-              <ul className="text-[11px] text-white/55">
-                <li>Service Worker: {swOK ? '✓' : '✗'}</li>
-                <li>Push API: {pmOK ? '✓' : '✗'}</li>
-                <li>Installed standalone: {standalone() ? '✓' : '✗'}</li>
-              </ul>
-              {isIOS && !standalone() && (
-                <p className="text-[11px] text-amber-300/80">iPhone/iPad: open in <b>Safari</b> → Share → <b>Add to Home Screen</b>, then launch from that icon (Safari only, not Chrome; needs iOS 16.4+).</p>
-              )}
-              {isIOS && standalone() && !pmOK && (
-                <p className="text-[11px] text-amber-300/80">Looks like iOS &lt; 16.4 — Web Push needs iOS/iPadOS 16.4+.</p>
-              )}
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 55 }} />
+          <div style={panel} className="rounded-xl border border-white/10 bg-[#10141a] p-3 text-[12px] text-white/80 shadow-2xl">
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-semibold text-white/90">Notifications</span>
+              <button onClick={() => setOpen(false)} className="text-white/40 text-[14px] leading-none px-1">✕</button>
             </div>
-          )}
-          {supported && !on && (
-            <>
-              <p className="mb-2 text-white/60">Get pinged when a team goes idle or an agent needs you — works on desktop &amp; installed-PWA mobile.</p>
-              <button onClick={enable} disabled={busy}
-                className="w-full rounded-lg py-1.5 text-[12px] font-semibold"
-                style={{ background: '#38bdf833', color: '#7dd3fc', border: '1px solid #38bdf855' }}>
-                {busy ? 'enabling…' : perm === 'denied' ? 'Notifications blocked — allow in browser' : 'Enable notifications'}
-              </button>
-            </>
-          )}
-          {supported && on && (
-            <>
-              <Row label="💤 Team-idle alerts" checked={prefs.teamIdle} onChange={(v) => syncPrefs({ ...prefs, teamIdle: v })} />
-              <Row label="🔔 Needs-input alerts" checked={prefs.waiting} onChange={(v) => syncPrefs({ ...prefs, waiting: v })} />
-              {prefs.teamIdle && teams.length > 0 && (
-                <div className="mt-2 border-t border-white/10 pt-2">
-                  <p className="mb-1 text-[10px] uppercase tracking-wide text-white/40">Per-team idle alerts</p>
-                  <div className="max-h-40 overflow-auto">
-                    {teams.map((t) => (
-                      <Row key={t} label={t} small checked={!prefs.teamsOff.includes(t)} onChange={() => toggleTeam(t)} />
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="mt-2 flex gap-2 border-t border-white/10 pt-2">
-                <button onClick={sendTest}
-                  className="flex-1 rounded-lg py-1 text-[11px]" style={{ background: '#ffffff10', color: '#bbb' }}>Send test</button>
-                <button onClick={disable} disabled={busy}
-                  className="flex-1 rounded-lg py-1 text-[11px]" style={{ background: '#f8717118', color: '#fca5a5' }}>Turn off</button>
+
+            {!supported && (
+              <div className="space-y-1 text-white/70">
+                <p>Push isn't available in this view.</p>
+                <ul className="text-[11px] text-white/55">
+                  <li>Service Worker: {swOK ? '✓' : '✗'}</li>
+                  <li>Push API: {pmOK ? '✓' : '✗'}</li>
+                  <li>Installed standalone: {standalone() ? '✓' : '✗'}</li>
+                </ul>
+                {isIOS && !standalone() && <p className="text-[11px] text-amber-300/80">iPhone/iPad: open in <b>Safari</b> → Share → <b>Add to Home Screen</b>, then launch from that icon (Safari only; needs iOS 16.4+).</p>}
+                {isIOS && standalone() && !pmOK && <p className="text-[11px] text-amber-300/80">Looks like iOS &lt; 16.4 — Web Push needs iOS/iPadOS 16.4+.</p>}
               </div>
-              {testMsg && <p className="mt-1 text-[10px] text-white/50 leading-snug">{testMsg}</p>}
-            </>
-          )}
+            )}
+
+            {supported && !on && (
+              <>
+                <p className="mb-2 text-white/60">Get pinged when a team goes idle or an agent needs you — works on desktop &amp; installed-PWA mobile.</p>
+                <button onClick={enable} disabled={busy} className="w-full rounded-lg py-1.5 text-[12px] font-semibold"
+                  style={{ background: '#38bdf833', color: '#7dd3fc', border: '1px solid #38bdf855' }}>
+                  {busy ? 'enabling…' : perm === 'denied' ? 'Notifications blocked — allow in browser' : 'Enable notifications'}
+                </button>
+              </>
+            )}
+
+            {supported && on && (
+              <>
+                <Section title="💤 Team idle" master={prefs.teamIdle} onMaster={(v) => syncPrefs({ ...prefs, teamIdle: v })}
+                  items={teams.map((t) => ({ key: t, name: t }))} off={prefs.teamsOff} onToggle={(k) => toggleIn('teamsOff', k)} empty="no active teams" />
+                <Section title="🔔 Needs input" master={prefs.waiting} onMaster={(v) => syncPrefs({ ...prefs, waiting: v })}
+                  items={agents} off={prefs.agentsOff} onToggle={(k) => toggleIn('agentsOff', k)} empty="no agents" />
+                <div className="mt-2 flex gap-2 border-t border-white/10 pt-2">
+                  <button onClick={sendTest} className="flex-1 rounded-lg py-1 text-[11px]" style={{ background: '#ffffff10', color: '#bbb' }}>Send test</button>
+                  <button onClick={disable} disabled={busy} className="flex-1 rounded-lg py-1 text-[11px]" style={{ background: '#f8717118', color: '#fca5a5' }}>Turn off</button>
+                </div>
+                {testMsg && <p className="mt-1 text-[10px] text-white/50 leading-snug">{testMsg}</p>}
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// A toggle group: a master on/off plus a scrollable per-item opt-out list.
+function Section({ title, master, onMaster, items, off, onToggle, empty }: {
+  title: string; master: boolean; onMaster: (v: boolean) => void;
+  items: { key?: string; id?: string; name: string }[]; off: string[]; onToggle: (key: string) => void; empty: string;
+}) {
+  return (
+    <div className="mt-2 border-t border-white/10 pt-2">
+      <Row label={title} bold checked={master} onChange={onMaster} />
+      {master && (
+        <div className="mt-1 max-h-36 overflow-auto pl-1">
+          {items.length === 0 && <p className="text-[11px] text-white/35">{empty}</p>}
+          {items.map((it) => {
+            const k = (it.key ?? it.id) as string;
+            return <Row key={k} label={it.name} small checked={!off.includes(k)} onChange={() => onToggle(k)} />;
+          })}
         </div>
       )}
     </div>
   );
 }
 
-function Row({ label, checked, onChange, small }: { label: string; checked: boolean; onChange: (v: boolean) => void; small?: boolean }) {
+function Row({ label, checked, onChange, small, bold }: { label: string; checked: boolean; onChange: (v: boolean) => void; small?: boolean; bold?: boolean }) {
   return (
     <label className={`flex items-center justify-between gap-2 ${small ? 'py-0.5' : 'py-1'} cursor-pointer`}>
-      <span className={small ? 'text-[11px] text-white/70 truncate' : 'text-white/85'}>{label}</span>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="accent-sky-400" />
+      <span className={small ? 'text-[11px] text-white/70 truncate' : bold ? 'text-white/90 font-medium' : 'text-white/85'}>{label}</span>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="accent-sky-400 shrink-0" />
     </label>
   );
 }

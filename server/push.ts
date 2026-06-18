@@ -16,9 +16,9 @@ const DIR = join(homedir(), '.fleet-town');
 const VAPID_FILE = join(DIR, 'vapid.json');
 const SUBS_FILE = join(DIR, 'push-subs.json');
 
-interface Prefs { teamIdle: boolean; waiting: boolean; teamsOff: string[] }
+interface Prefs { teamIdle: boolean; waiting: boolean; teamsOff: string[]; agentsOff: string[] }
 interface Sub { endpoint: string; sub: webpush.PushSubscription; prefs: Prefs }
-const DEFAULT_PREFS: Prefs = { teamIdle: true, waiting: true, teamsOff: [] };
+const DEFAULT_PREFS: Prefs = { teamIdle: true, waiting: true, teamsOff: [], agentsOff: [] };
 
 function load<T>(file: string, fallback: T): T {
   try { return JSON.parse(readFileSync(file, 'utf8')) as T; } catch { return fallback; }
@@ -129,7 +129,7 @@ async function tick(getState: () => Promise<State>) {
     waitingNow.add(a.id);
     if (prevWaiting.has(a.id)) continue;
     const who = `${a.role || 'agent'}${a.label && a.label !== 'oracle' ? '·' + a.label : ''}`;
-    for (const s of subs) if (s.prefs.waiting) {
+    for (const s of subs) if (s.prefs.waiting && !(s.prefs.agentsOff || []).includes(a.id)) {
       void send(s, { title: '🔔 Needs your input', body: `${who} is waiting at a menu`, tag: `wait-${a.id}`, url: '/town', sticky: true });
     }
   }
