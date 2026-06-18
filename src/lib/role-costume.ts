@@ -83,3 +83,25 @@ export function charIndexFor(role: string): number {
 export function ctxColor(pct: number): string {
   return pct > 50 ? '#4ade80' : pct > 20 ? '#fbbf24' : '#f87171';
 }
+
+// Activity emoji guessed from the agent's current task (ai-town shows an emoji
+// "activity" above the head). Ordered most-specific first; falls back to 💭.
+const ACTIVITY: Array<[RegExp, string]> = [
+  [/deploy|ship|release|rollout|prod|staging|vercel|wrangler/i, '🚀'],
+  [/\bpr\b|pull request|merge|commit|push|rebase/i, '📤'],
+  [/test|journey|e2e|playwright|smoke|live-?test|verify run/i, '🧪'],
+  [/migrat|schema|\bsql\b|\bdb\b|drizzle|dedupe|index/i, '🗄️'],
+  [/investigat|trace|root cause|diagnos|debug|reproduce/i, '🔍'],
+  [/fix|bug|patch|repair|hotfix|broken/i, '🔧'],
+  [/review|audit|seal|ratif|approve|gate/i, '🔎'],
+  [/write|doc|charter|spec|\badr\b|retro|runbook/i, '📝'],
+  [/\bui\b|portal|design|page|render|component|css/i, '🎨'],
+  [/build|workflow|orchestrat|dispatch|scaffold|campaign/i, '⚙️'],
+  [/search|index|memory|arra|vault/i, '🔭'],
+];
+
+export function activityEmoji(task: string): string {
+  const t = task || '';
+  for (const [re, emoji] of ACTIVITY) if (re.test(t)) return emoji;
+  return '💭';
+}

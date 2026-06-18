@@ -83,6 +83,23 @@
   position: absolute; top: -16px; right: 2px;
   color: rgba(255,255,255,0.65); font-size: 12px; font-weight: 700; pointer-events: none;
 }
+/* ai-town-style activity bubble — shows WHAT each agent is doing. Upper-right of
+   the sprite (the nametag sits top-center), like a live status badge. */
+.town-bubble {
+  position: absolute; top: 2px; right: -8px;
+  font-size: 13px; line-height: 1; padding: 2px 4px; border-radius: 9px;
+  background: rgba(248,248,252,0.95); box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  pointer-events: none; white-space: nowrap; z-index: 6;
+}
+.town-bubble::after {
+  content: ''; position: absolute; bottom: -3px; left: 6px;
+  border-left: 3px solid transparent; border-right: 3px solid transparent;
+  border-top: 4px solid rgba(248,248,252,0.95);
+}
+.town-bubble-work { animation: town-bubble-pulse 1.4s ease-in-out infinite; transform-origin: bottom left; }
+.town-bubble-idle { opacity: 0.6; }
+@keyframes town-bubble-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+@media (prefers-reduced-motion: reduce) { .town-bubble-work { animation: none; } }
 .town-crown {
   position: absolute; top: -26px; left: 50%; transform: translateX(-50%);
   font-size: 13px; pointer-events: none; filter: drop-shadow(0 1px 2px #000);

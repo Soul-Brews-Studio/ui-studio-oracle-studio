@@ -76,9 +76,9 @@ export function AgentChat({ agent, onClose }: { agent: FleetAgent; onClose: () =
   const keyBtnStyle = { background: '#1a1a22', border: '1px solid rgba(255,255,255,0.12)', color: '#cdd2cd' };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-3" onClick={onClose}>
       <div
-        className="flex flex-col w-full max-w-3xl h-[80vh] rounded-xl border overflow-hidden shadow-2xl"
+        className="flex flex-col w-[97vw] h-[94vh] rounded-xl border overflow-hidden shadow-2xl"
         style={{ background: '#0c0c12', borderColor: cos.color + '66' }}
         onClick={(e) => e.stopPropagation()}
       >

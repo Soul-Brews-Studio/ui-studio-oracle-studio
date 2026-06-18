@@ -2,7 +2,7 @@
 // the label tag distinguishes duplicate roles; the status dot/animation shows
 // working (walking) vs asleep (✳ + drifting z) vs offline (greyed). A thin bar
 // shows remaining context %. Click to open the agent's text session.
-import { costumeFor, ctxColor } from '../../lib/role-costume';
+import { costumeFor, ctxColor, activityEmoji } from '../../lib/role-costume';
 import type { FleetAgent } from '../../lib/fleet';
 
 const STATUS_DOT: Record<FleetAgent['status'], string> = {
@@ -47,7 +47,10 @@ export function AgentTile({ agent, onSelect, ring }: Props) {
             <span className="text-[10px] font-mono truncate text-white/45">·{agent.label}</span>
           )}
         </div>
-        <div className="text-[10.5px] truncate text-white/50">{agent.task || '—'}</div>
+        <div className="text-[10.5px] truncate text-white/50">
+          {agent.status === 'working' && <span className="mr-0.5">{activityEmoji(agent.task)}</span>}
+          {agent.task || '—'}
+        </div>
         {agent.ctxPct != null && (
           <div className="mt-1 flex items-center gap-1">
             <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>

@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FleetState, FleetAgent } from '../../lib/fleet';
 import { groupTown } from '../../lib/town-group';
 import { buildStage } from '../../lib/town-stage';
-import { costumeFor, charIndexFor, ctxColor } from '../../lib/role-costume';
+import { costumeFor, charIndexFor, ctxColor, activityEmoji } from '../../lib/role-costume';
 import { SHEET_URL, SHEET_W, SHEET_H, SPRITE, bgPos } from '../../lib/sprite';
 
 interface Actor {
@@ -170,7 +170,10 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
               {a.label && a.label !== 'oracle' ? <span className="town-nametag-slug">·{a.label}</span> : null}
               {a.ctxPct != null ? <span className="town-nametag-slug" style={{ color: ctxColor(a.ctxPct) }}> {a.ctxPct}%</span> : null}
             </span>
-            {a.status === 'idle' && <span className="town-zzz town-zzz-pixel">z</span>}
+            {a.status === 'working' && (
+              <span className="town-bubble town-bubble-work" title={a.task || ''}>{activityEmoji(a.task)}</span>
+            )}
+            {a.status === 'idle' && <span className="town-bubble town-bubble-idle">💤</span>}
           </div>
         );
       })}
