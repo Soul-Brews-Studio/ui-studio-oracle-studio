@@ -20,6 +20,7 @@ interface Actor {
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+const DRAG_PAUSE_MS = 2000; // after a drop, the sprite stands here this long, then wanders on
 
 function pickTarget(a: Actor) {
   a.tx = rnd(a.home.x, a.home.x + Math.max(1, a.home.w - SPRITE));
@@ -69,7 +70,11 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
     const d = drag.current;
     drag.current = null;
     try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
-    if (d && d.id === a.id && !d.moved) onSelect(a); // click, not a drag
+    if (!d || d.id !== a.id) return;
+    if (!d.moved) { onSelect(a); return; } // a press without movement = click → open chat
+    // Dropped after a drag: don't freeze it — pause where it landed, then wander on.
+    const act = actors.current.get(a.id);
+    if (act) { act.pinned = false; act.waitT = DRAG_PAUSE_MS; act.frame = 0; }
   };
 
   // Fill the available width — the walking area grows with the viewport.
