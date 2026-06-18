@@ -50,12 +50,12 @@
   image-rendering: pixelated;
   border-radius: 12px;
   overflow: hidden;
-  background-color: #16271a;
-  background-image:
-    repeating-linear-gradient(0deg, #1b3322 0 9px, #16291c 9px 18px),
-    repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0 9px, transparent 9px 18px),
-    radial-gradient(rgba(120,180,110,0.10) 1px, transparent 1px);
-  background-size: auto, auto, 18px 18px;
+  /* Real ai-town grass tile (gentle-obj base ground, gid 271) repeated to fill
+     the whole map. 32px tile rendered at 2× to match the folk-sprite scale. */
+  background-color: #4e7a3a;
+  background-image: url('/assets/town/grass.png');
+  background-repeat: repeat;
+  background-size: 64px 64px;
   box-shadow: inset 0 0 90px rgba(0,0,0,0.55);
 }
 .town-district-label {
@@ -79,10 +79,12 @@
 .town-deco, .town-anim {
   position: absolute; left: 0; top: 0;
   background-repeat: no-repeat; image-rendering: pixelated;
-  pointer-events: none; z-index: 0; will-change: transform;
+  pointer-events: none; will-change: transform;
 }
-.town-deco { opacity: 0.9; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.35)); }
-.town-anim { filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4)); }
+/* Nature tucks behind the zone panels (z 0); animated objects (incl. the team
+   hearth campfire) sit above the zone tint but below agents (z 3). */
+.town-deco { z-index: 0; opacity: 0.9; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.35)); }
+.town-anim { z-index: 2; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4)); }
 .town-actor {
   position: absolute; left: 0; top: 0;
   background-repeat: no-repeat; image-rendering: pixelated;

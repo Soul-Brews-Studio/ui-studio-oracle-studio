@@ -82,6 +82,15 @@ export function buildProps(stage: Stage): TownProps {
   const decos: PlacedDeco[] = [];
   const anims: PlacedAnim[] = [];
 
+  // A campfire always burns at the centre of every team/campaign cluster — the
+  // group's "hearth" that its members wander around. Intentionally placed inside
+  // the zone (skips the overlap check); commons is loose individuals, not a team.
+  for (const z of zones) {
+    if (z.kind === 'commons') continue;
+    const s = ANIMS.campfire.size;
+    anims.push({ id: `hearth-${z.id}`, x: z.x + z.w / 2 - s / 2, y: z.y + z.h / 2 - s / 2, spec: ANIMS.campfire });
+  }
+
   for (let gx = 6; gx + GRID < width; gx += GRID) {
     for (let gy = 6; gy + GRID < height; gy += GRID) {
       const cx = Math.round(gx / GRID), cy = Math.round(gy / GRID);
@@ -90,10 +99,7 @@ export function buildProps(stage: Stage): TownProps {
       const y = gy + rng(cx, cy + 7) * (GRID - 44);
       const roll = rng(cx + 3, cy + 5);
 
-      if (roll < 0.08) {                                      // a few campfires
-        if (!overlapsZone(x, y, ANIMS.campfire.size, zones, 6))
-          anims.push({ id: `f${cx}-${cy}`, x, y, spec: ANIMS.campfire });
-      } else if (roll < 0.20) {                               // and water sparkles
+      if (roll < 0.14) {                                      // water sparkles
         if (!overlapsZone(x, y, ANIMS.sparkle.size, zones, 4))
           anims.push({ id: `s${cx}-${cy}`, x, y, spec: ANIMS.sparkle });
       } else {                                                // the rest is nature
