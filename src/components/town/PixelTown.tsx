@@ -188,8 +188,8 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
       {/* Ambient scenery — pure decoration on the grass, behind every agent. */}
       {props.decos.map((d) => (
         <div key={d.id} className="town-deco" style={{
-          width: d.spec.size, height: d.spec.size,
-          backgroundImage: `url(${d.spec.url})`, backgroundSize: `${d.spec.size}px ${d.spec.size}px`,
+          width: d.spec.w, height: d.spec.h,
+          backgroundImage: `url(${d.spec.url})`, backgroundSize: `${d.spec.w}px ${d.spec.h}px`,
           transform: `translate(${d.x}px, ${d.y}px)`,
         }} />
       ))}

@@ -1,6 +1,6 @@
-// Ambient props for Fleet Town — purely decorative nature (trees/bushes/flowers/
-// logs) and animated objects (campfire, windmill, water sparkle) scattered over
-// the grass between zones. Reflects the map's *atmosphere* only — never agent
+// Ambient props for Fleet Town — purely decorative nature (trees/bushes/rocks/
+// grass tufts) and animated objects (campfire, windmill, water sparkle) scattered
+// over the grass between zones. Reflects the map's *atmosphere* only — never agent
 // state (Oracle/Shadow P-002/P-003: the town mirrors, it never drives or implies).
 //
 // Placement is DETERMINISTIC and seeded by GRID CELL, not by the agent set: a
@@ -8,9 +8,10 @@
 // as agents come and go. A prop is dropped only when its cell is clear of every
 // zone, so it simply hides when a zone grows over it (instead of teleporting).
 //
-// Sprites come from ai-town's Gentle Forest tileset (CC0) — see
-// public/assets/town/CREDITS.md. The animated sheets keep ai-town's frame
-// geometry (data/animations/*.json); decoration PNGs are pre-trimmed crops.
+// The ground + nature decos are the Cainos "Pixel Art Top Down - Basic" set (one
+// cohesive 32px pack; decos ship with transparent backgrounds + baked shadows).
+// The animated campfire/windmill/sparkle are ai-town sheets (no Cainos equivalent)
+// and keep ai-town's frame geometry. See public/assets/town/CREDITS.md.
 import type { Stage, StageZone } from './town-stage';
 
 const A = '/assets/town';
@@ -23,7 +24,7 @@ export interface AnimSpec {
   fps: number;
   size: number;                      // on-screen render box (px)
 }
-export interface DecoSpec { url: string; size: number }
+export interface DecoSpec { url: string; w: number; h: number }  // on-screen render px (aspect-correct)
 
 // Animated objects. Frame coords mirror ai-town data/animations/*.json.
 export const ANIMS = {
@@ -43,12 +44,13 @@ export const ANIMS = {
 } satisfies Record<string, AnimSpec>;
 export type AnimKind = keyof typeof ANIMS;
 
-// Static nature decorations (pre-trimmed square PNGs).
+// Static nature decorations (Cainos, transparent + baked shadow). Render px is 2×
+// the trimmed native size, matching the folk-sprite / grass 2× pixel scale.
 export const DECOS = {
-  tree:    { url: `${A}/tree.png`,    size: 58 },
-  bush:    { url: `${A}/bush.png`,    size: 38 },
-  flowers: { url: `${A}/flowers.png`, size: 34 },
-  logs:    { url: `${A}/logs.png`,    size: 40 },
+  tree: { url: `${A}/tree.png`, w: 256, h: 272 },  // native 128×136 — the lush landmark
+  bush: { url: `${A}/bush.png`, w: 64, h: 62 },    // native 32×31
+  rock: { url: `${A}/rock.png`, w: 58, h: 54 },    // native 29×27
+  tuft: { url: `${A}/tuft.png`, w: 98, h: 20 },    // native 49×10 — grass clump
 } satisfies Record<string, DecoSpec>;
 export type DecoKind = keyof typeof DECOS;
 
@@ -65,10 +67,10 @@ function hash1(n: number): number {
 }
 const rng = (a: number, b: number) => hash1(((a * 73856093) ^ (b * 19349663)) >>> 0);
 
-// Does a `size`-box at (x,y) intersect any zone (grown by margin `m`)?
-function overlapsZone(x: number, y: number, size: number, zones: StageZone[], m: number): boolean {
+// Does a w×h box at (x,y) intersect any zone (grown by margin `m`)?
+function overlapsZone(x: number, y: number, w: number, h: number, zones: StageZone[], m: number): boolean {
   for (const z of zones) {
-    if (x + size > z.x - m && x < z.x + z.w + m && y + size > z.y - m && y < z.y + z.h + m) return true;
+    if (x + w > z.x - m && x < z.x + z.w + m && y + h > z.y - m && y < z.y + z.h + m) return true;
   }
   return false;
 }
@@ -99,13 +101,14 @@ export function buildProps(stage: Stage): TownProps {
       const y = gy + rng(cx, cy + 7) * (GRID - 44);
       const roll = rng(cx + 3, cy + 5);
 
-      if (roll < 0.14) {                                      // water sparkles
-        if (!overlapsZone(x, y, ANIMS.sparkle.size, zones, 4))
+      if (roll < 0.12) {                                      // water sparkles
+        const s = ANIMS.sparkle.size;
+        if (!overlapsZone(x, y, s, s, zones, 4))
           anims.push({ id: `s${cx}-${cy}`, x, y, spec: ANIMS.sparkle });
       } else {                                                // the rest is nature
-        const spec = roll < 0.56 ? DECOS.tree : roll < 0.76 ? DECOS.bush
-          : roll < 0.90 ? DECOS.flowers : DECOS.logs;
-        if (!overlapsZone(x, y, spec.size, zones, 4))
+        const spec = roll < 0.40 ? DECOS.tuft : roll < 0.66 ? DECOS.bush
+          : roll < 0.86 ? DECOS.rock : DECOS.tree;
+        if (!overlapsZone(x, y, spec.w, spec.h, zones, 4))
           decos.push({ id: `d${cx}-${cy}`, x, y, spec });
       }
     }
@@ -115,7 +118,7 @@ export function buildProps(stage: Stage): TownProps {
   const wm = ANIMS.windmill;
   outer: for (let gx = Math.floor(width * 0.62); gx + wm.size < width - 6; gx += GRID) {
     for (let gy = 6; gy + wm.size < height - 6; gy += GRID) {
-      if (!overlapsZone(gx, gy, wm.size, zones, 10)) {
+      if (!overlapsZone(gx, gy, wm.size, wm.size, zones, 10)) {
         anims.push({ id: 'windmill', x: gx, y: gy, spec: wm });
         break outer;
       }

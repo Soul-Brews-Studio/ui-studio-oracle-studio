@@ -1,20 +1,24 @@
 # Fleet Town sprite credits
 
-All sprites in this directory are pixel-art assets reused from
-[a16z-infra/ai-town](https://github.com/a16z-infra/ai-town) (code MIT-licensed),
-which in turn sources its art from OpenGameArt:
+Pixel-art assets used by the `/town` view, from two sources:
 
-- **Characters** (`folk.png`) and **forest objects** (`tree.png`, `bush.png`,
-  `flowers.png`, `logs.png`) and **animated objects** (`campfire.png`,
-  `windmill.png`, `sparkle.png`) — derived from **"Tiny RPG Forest" by ansimuz**
-  (<https://opengameart.org/content/tiny-rpg-forest>), released **CC0**
-  (public domain).
+## Ground + nature decorations — Cainos "Pixel Art Top Down - Basic"
+`grass.png`, `tree.png`, `bush.png`, `rock.png`, `tuft.png` are from the
+**Cainos "Pixel Art Top Down - Basic"** pack
+(<https://cainos.itch.io/pixel-art-top-down-basic>), 32×32, one cohesive set.
 
-The decoration sprites here are tile crops extracted from ai-town's
-`gentle-obj.png`; the animated sheets are copied as-is from ai-town's
-`public/assets/spritesheets/` (`campfire.png`, `windmill.png`,
-`gentlesparkle32.png` → `sparkle.png`). Frame geometry mirrors ai-town's
-`data/animations/*.json`.
+> License (verbatim): "This asset pack can be used in both free and commercial
+> projects. You can modify it to suit your own needs. Credit is not needed but
+> appreciated. You may not redistribute it or resell it."
 
-CC0 imposes no obligations, but attribution is kept here as a courtesy and to
-record provenance (Code is Truth — record where things came from).
+`grass.png` is a 4×4 block of the pack's calm grass-variant tiles. The deco PNGs
+are trimmed crops of `TX Plant with Shadow` / `TX Props with Shadow` (transparent
+backgrounds with baked shadows). Used here for a single internal/personal tool,
+not redistributed or resold as an asset pack.
+
+## Animated objects — ai-town (ansimuz "Tiny RPG Forest", CC0)
+`campfire.png`, `windmill.png`, `sparkle.png` are from
+[a16z-infra/ai-town](https://github.com/a16z-infra/ai-town) (code MIT), art from
+**ansimuz "Tiny RPG Forest"** (<https://opengameart.org/content/tiny-rpg-forest>),
+**CC0**. Cainos has no animated objects, so these provide the campfire / windmill /
+sparkle. Frame geometry mirrors ai-town's `data/animations/*.json`.

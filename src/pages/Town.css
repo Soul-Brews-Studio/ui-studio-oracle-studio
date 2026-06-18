@@ -50,12 +50,12 @@
   image-rendering: pixelated;
   border-radius: 12px;
   overflow: hidden;
-  /* Real ai-town grass tile (gentle-obj base ground, gid 271) repeated to fill
-     the whole map. 32px tile rendered at 2× to match the folk-sprite scale. */
-  background-color: #4e7a3a;
+  /* Cainos grass — a 4×4 (128px) block of calm olive grass variants, repeated to
+     fill the map. Rendered at 2× (256px block) to match the folk-sprite scale. */
+  background-color: #6a7a30;
   background-image: url('/assets/town/grass.png');
   background-repeat: repeat;
-  background-size: 64px 64px;
+  background-size: 256px 256px;
   box-shadow: inset 0 0 90px rgba(0,0,0,0.55);
 }
 .town-district-label {
@@ -82,8 +82,9 @@
   pointer-events: none; will-change: transform;
 }
 /* Nature tucks behind the zone panels (z 0); animated objects (incl. the team
-   hearth campfire) sit above the zone tint but below agents (z 3). */
-.town-deco { z-index: 0; opacity: 0.9; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.35)); }
+   hearth campfire) sit above the zone tint but below agents (z 3). Cainos decos
+   bake their own shadow, so no CSS drop-shadow on them. */
+.town-deco { z-index: 0; }
 .town-anim { z-index: 2; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4)); }
 .town-actor {
   position: absolute; left: 0; top: 0;
