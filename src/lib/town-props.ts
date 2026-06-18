@@ -36,11 +36,6 @@ export const ANIMS = {
     url: `${A}/sparkle.png`, fw: 32, fh: 32, sheetW: 96, sheetH: 96,
     frames: [[0, 0], [32, 0], [64, 0]], fps: 6, size: 24,
   },
-  windmill: {
-    url: `${A}/windmill.png`, fw: 208, fh: 208, sheetW: 624, sheetH: 624,
-    frames: [[0, 0], [208, 0], [416, 0], [0, 208], [208, 208], [416, 208], [0, 416], [208, 416]],
-    fps: 7, size: 104,
-  },
 } satisfies Record<string, AnimSpec>;
 export type AnimKind = keyof typeof ANIMS;
 
@@ -53,6 +48,10 @@ export const DECOS = {
   tuft: { url: `${A}/tuft.png`, w: 98, h: 20 },    // native 49×10 — grass clump
 } satisfies Record<string, DecoSpec>;
 export type DecoKind = keyof typeof DECOS;
+
+// A single Cainos statue monument — the town's landmark (replaces the off-set
+// ai-town windmill). Placed once in the open top-right grass.
+export const LANDMARK: DecoSpec = { url: `${A}/landmark.png`, w: 92, h: 146 };
 
 export interface PlacedDeco { id: string; x: number; y: number; spec: DecoSpec }
 export interface PlacedAnim { id: string; x: number; y: number; spec: AnimSpec }
@@ -114,12 +113,11 @@ export function buildProps(stage: Stage): TownProps {
     }
   }
 
-  // One windmill landmark: first clear spot scanning the top-right grass.
-  const wm = ANIMS.windmill;
-  outer: for (let gx = Math.floor(width * 0.62); gx + wm.size < width - 6; gx += GRID) {
-    for (let gy = 6; gy + wm.size < height - 6; gy += GRID) {
-      if (!overlapsZone(gx, gy, wm.size, wm.size, zones, 10)) {
-        anims.push({ id: 'windmill', x: gx, y: gy, spec: wm });
+  // One statue landmark: first clear spot scanning the top-right grass.
+  outer: for (let gx = Math.floor(width * 0.62); gx + LANDMARK.w < width - 6; gx += GRID) {
+    for (let gy = 6; gy + LANDMARK.h < height - 6; gy += GRID) {
+      if (!overlapsZone(gx, gy, LANDMARK.w, LANDMARK.h, zones, 10)) {
+        decos.push({ id: 'landmark', x: gx, y: gy, spec: LANDMARK });
         break outer;
       }
     }
