@@ -7,7 +7,12 @@ interface Prefs { teamIdle: boolean; waiting: boolean; teamsOff: string[] }
 const DEFAULT: Prefs = { teamIdle: true, waiting: true, teamsOff: [] };
 const LS = 'fleet-notif-prefs';
 
-const supported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
+const hasWin = typeof window !== 'undefined';
+const swOK = hasWin && 'serviceWorker' in navigator;
+const pmOK = hasWin && 'PushManager' in window;
+const supported = swOK && pmOK;
+const isIOS = hasWin && /iphone|ipad|ipod/i.test(navigator.userAgent);
+const standalone = () => hasWin && (window.matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true);
 
 function b64ToU8(base64: string): Uint8Array {
   const pad = '='.repeat((4 - (base64.length % 4)) % 4);
@@ -25,6 +30,16 @@ export function Notifications({ teams }: { teams: string[] }) {
   const [perm, setPerm] = useState<NotificationPermission>(supported ? Notification.permission : 'denied');
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
   const [busy, setBusy] = useState(false);
+  const [testMsg, setTestMsg] = useState('');
+
+  async function sendTest() {
+    if (!endpoint) return;
+    setTestMsg('sending…');
+    try {
+      const r = await post('/__fleet/push/test', { endpoint }).then((x) => x.json());
+      setTestMsg(r.ok ? `server sent ✓ (FCM ${r.statusCode}) — if no popup, check OS/Chrome notification settings` : `error: ${r.statusCode || ''} ${r.error || ''}`);
+    } catch { setTestMsg('request failed'); }
+  }
 
   // Reflect an already-installed subscription on load.
   useEffect(() => {
@@ -81,7 +96,22 @@ export function Notifications({ teams }: { teams: string[] }) {
 
       {open && (
         <div className="absolute right-0 mt-1 z-50 w-64 rounded-xl border border-white/10 bg-[#10141a] p-3 text-[12px] text-white/80 shadow-2xl">
-          {!supported && <p className="text-white/50">Push not supported in this browser.</p>}
+          {!supported && (
+            <div className="space-y-1 text-white/70">
+              <p className="font-semibold text-white/90">Push isn't available in this view.</p>
+              <ul className="text-[11px] text-white/55">
+                <li>Service Worker: {swOK ? '✓' : '✗'}</li>
+                <li>Push API: {pmOK ? '✓' : '✗'}</li>
+                <li>Installed standalone: {standalone() ? '✓' : '✗'}</li>
+              </ul>
+              {isIOS && !standalone() && (
+                <p className="text-[11px] text-amber-300/80">iPhone/iPad: open in <b>Safari</b> → Share → <b>Add to Home Screen</b>, then launch from that icon (Safari only, not Chrome; needs iOS 16.4+).</p>
+              )}
+              {isIOS && standalone() && !pmOK && (
+                <p className="text-[11px] text-amber-300/80">Looks like iOS &lt; 16.4 — Web Push needs iOS/iPadOS 16.4+.</p>
+              )}
+            </div>
+          )}
           {supported && !on && (
             <>
               <p className="mb-2 text-white/60">Get pinged when a team goes idle or an agent needs you — works on desktop &amp; installed-PWA mobile.</p>
@@ -107,11 +137,12 @@ export function Notifications({ teams }: { teams: string[] }) {
                 </div>
               )}
               <div className="mt-2 flex gap-2 border-t border-white/10 pt-2">
-                <button onClick={() => endpoint && post('/__fleet/push/test', { endpoint })}
+                <button onClick={sendTest}
                   className="flex-1 rounded-lg py-1 text-[11px]" style={{ background: '#ffffff10', color: '#bbb' }}>Send test</button>
                 <button onClick={disable} disabled={busy}
                   className="flex-1 rounded-lg py-1 text-[11px]" style={{ background: '#f8717118', color: '#fca5a5' }}>Turn off</button>
               </div>
+              {testMsg && <p className="mt-1 text-[10px] text-white/50 leading-snug">{testMsg}</p>}
             </>
           )}
         </div>

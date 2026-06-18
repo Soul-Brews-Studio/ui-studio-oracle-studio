@@ -48,12 +48,15 @@ function setPrefs(endpoint: string, prefs: Partial<Prefs>) {
 }
 function remove(endpoint: string) { subs = subs.filter((s) => s.endpoint !== endpoint); persist(); }
 
-async function send(s: Sub, payload: object) {
+async function send(s: Sub, payload: object): Promise<{ ok: boolean; statusCode?: number; error?: string }> {
   try {
-    await webpush.sendNotification(s.sub, JSON.stringify(payload));
+    const res = await webpush.sendNotification(s.sub, JSON.stringify(payload));
+    return { ok: true, statusCode: res.statusCode };
   } catch (e: unknown) {
-    const code = (e as { statusCode?: number }).statusCode;
-    if (code === 404 || code === 410) remove(s.endpoint); // subscription dead → drop it
+    const err = e as { statusCode?: number; body?: string; message?: string };
+    if (err.statusCode === 404 || err.statusCode === 410) remove(s.endpoint); // dead → drop
+    console.error('[push] send failed', err.statusCode, err.body || err.message);
+    return { ok: false, statusCode: err.statusCode, error: err.body || err.message };
   }
 }
 
@@ -78,8 +81,9 @@ export async function handlePush(req: Request, p: string): Promise<Response | nu
   if (p === '/__fleet/push/test' && req.method === 'POST') {
     const b = (await req.json()) as { endpoint: string };
     const s = subs.find((x) => x.endpoint === b.endpoint);
-    if (s) await send(s, { title: 'Fleet Town', body: 'Notifications are on ✅', tag: 'test' });
-    return Response.json({ ok: !!s });
+    if (!s) return Response.json({ ok: false, error: 'no subscription stored on server — re-enable' });
+    const r = await send(s, { title: 'Fleet Town', body: 'Notifications are on ✅', tag: 'test', sticky: true });
+    return Response.json(r);
   }
   return null;
 }

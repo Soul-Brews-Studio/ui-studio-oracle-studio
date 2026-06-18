@@ -29,7 +29,18 @@ const API_ALLOW = new Set(['/api/health', '/api/auth/status']);
 // same-origin → our forwarded /api/health passes the gate (the rest of /api stays 404'd).
 const SEED = `<script>try{var k='oracle-studio-host';if(!localStorage.getItem(k))localStorage.setItem(k,location.origin);}catch(e){}</script>`;
 // PWA: make /town installable + register the service worker (push display).
-const PWA = `<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#6a7a30"><link rel="apple-touch-icon" href="/icon-192.png"><script>if('serviceWorker'in navigator){addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){})})}</script>`;
+// The apple-mobile-web-app-* metas make iOS launch it in STANDALONE mode from the
+// Home Screen — required for the Push API (window.PushManager) to be exposed there.
+const PWA = [
+  `<link rel="manifest" href="/manifest.webmanifest">`,
+  `<meta name="theme-color" content="#6a7a30">`,
+  `<link rel="apple-touch-icon" href="/icon-192.png">`,
+  `<meta name="apple-mobile-web-app-capable" content="yes">`,
+  `<meta name="mobile-web-app-capable" content="yes">`,
+  `<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">`,
+  `<meta name="apple-mobile-web-app-title" content="Fleet Town">`,
+  `<script>if('serviceWorker'in navigator){addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){})})}</script>`,
+].join('');
 const INDEX_HTML = (await Bun.file(join(DIST, 'index.html')).text()).replace('<head>', '<head>' + SEED + PWA);
 
 const EMPTY = {
