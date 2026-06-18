@@ -31,7 +31,7 @@ const INDEX_HTML = (await Bun.file(join(DIST, 'index.html')).text()).replace('<h
 
 const EMPTY = {
   ts: '', host: '', agents: [], teams: [], roads: [],
-  counts: { working: 0, idle: 0, offline: 0, teams: 0, agents: 0 },
+  counts: { working: 0, idle: 0, offline: 0, teams: 0, agents: 0, waiting: 0 },
 };
 
 const server = Bun.serve({

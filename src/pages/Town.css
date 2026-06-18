@@ -99,7 +99,26 @@
 .town-bubble-work { animation: town-bubble-pulse 1.4s ease-in-out infinite; transform-origin: bottom left; }
 .town-bubble-idle { opacity: 0.6; }
 @keyframes town-bubble-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
-@media (prefers-reduced-motion: reduce) { .town-bubble-work { animation: none; } }
+/* WAITING for input — the "needs you" state. Loud amber bell + glowing sprite. */
+.town-bubble-wait {
+  background: #fbbf24; box-shadow: 0 0 8px #fbbf24cc;
+  animation: town-wait-pulse 0.7s ease-in-out infinite; transform-origin: bottom left;
+}
+.town-bubble-wait::after { border-top-color: #fbbf24; }
+@keyframes town-wait-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
+.town-actor-wait { animation: town-wait-glow 0.7s ease-in-out infinite; }
+@keyframes town-wait-glow {
+  0%, 100% { filter: drop-shadow(0 0 3px #fbbf24); }
+  50%      { filter: drop-shadow(0 0 10px #fbbf24); }
+}
+.town-wait-chip { animation: town-wait-chip 1.2s ease-in-out infinite; }
+@keyframes town-wait-chip {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251,191,36,0); }
+  50%      { box-shadow: 0 0 8px 1px rgba(251,191,36,0.45); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .town-bubble-work, .town-bubble-wait, .town-actor-wait, .town-wait-chip { animation: none; }
+}
 .town-crown {
   position: absolute; top: -26px; left: 50%; transform: translateX(-50%);
   font-size: 13px; pointer-events: none; filter: drop-shadow(0 1px 2px #000);

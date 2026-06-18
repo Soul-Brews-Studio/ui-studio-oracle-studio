@@ -152,7 +152,7 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
           <div
             key={a.id}
             ref={(el) => { if (el) els.current.set(a.id, el); else els.current.delete(a.id); }}
-            className={`town-actor town-actor-${a.status}`}
+            className={`town-actor town-actor-${a.status}${a.waiting ? ' town-actor-wait' : ''}`}
             onClick={() => onSelect(a)}
             style={{
               width: SPRITE, height: SPRITE,
@@ -170,10 +170,13 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
               {a.label && a.label !== 'oracle' ? <span className="town-nametag-slug">·{a.label}</span> : null}
               {a.ctxPct != null ? <span className="town-nametag-slug" style={{ color: ctxColor(a.ctxPct) }}> {a.ctxPct}%</span> : null}
             </span>
-            {a.status === 'working' && (
+            {a.waiting ? (
+              <span className="town-bubble town-bubble-wait" title="waiting for your input — click to answer the menu">🔔</span>
+            ) : a.status === 'working' ? (
               <span className="town-bubble town-bubble-work" title={a.task || ''}>{activityEmoji(a.task)}</span>
-            )}
-            {a.status === 'idle' && <span className="town-bubble town-bubble-idle">💤</span>}
+            ) : a.status === 'idle' ? (
+              <span className="town-bubble town-bubble-idle">💤</span>
+            ) : null}
           </div>
         );
       })}

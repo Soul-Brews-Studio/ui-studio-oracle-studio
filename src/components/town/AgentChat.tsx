@@ -12,7 +12,11 @@ type Tab = 'history' | 'live';
 export function AgentChat({ agent, onClose }: { agent: FleetAgent; onClose: () => void }) {
   const [tab, setTab] = useState<Tab>('live');
   const [text, setText] = useState('');
-  const [input, setInput] = useState('');
+  // Persist the unsent draft per agent — survives closing/reopening the window.
+  const draftKey = `town:draft:${agent.id}`;
+  const [input, setInput] = useState(() => {
+    try { return localStorage.getItem(draftKey) || ''; } catch { return ''; }
+  });
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
@@ -40,6 +44,10 @@ export function AgentChat({ agent, onClose }: { agent: FleetAgent; onClose: () =
     const el = preRef.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [text]);
+
+  useEffect(() => {
+    try { if (input) localStorage.setItem(draftKey, input); else localStorage.removeItem(draftKey); } catch { /* ignore */ }
+  }, [input, draftKey]);
 
   const refreshSoon = (ms: number) => setTimeout(async () => {
     try { setText(await load()); } catch { /* next poll */ }

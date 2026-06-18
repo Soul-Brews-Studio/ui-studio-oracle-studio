@@ -42,3 +42,18 @@ export function closePane(id: string): void {
   if (!validPane(id)) throw new Error('bad pane id');
   execFileSync('tmux', ['kill-pane', '-t', id]);
 }
+
+// A TUI selection menu (AskUserQuestion / numbered choices) is up and blocking on a
+// human answer — the strongest signals are the cursored option and the menu footer
+// (matches brewbot pane-classify.sh's `menu` state). The fleet runs with
+// --dangerously-skip-permissions, so the menu prompt is the live "needs you" case.
+const MENU_RE = [/^[ \t]*❯[ \t]*\d+[.)]/m, /Enter to select|↑\/↓ to navigate|to select ·/i];
+
+/** True when the pane is parked on a menu waiting for our input. Cheap (visible screen). */
+export function paneNeedsInput(id: string): boolean {
+  if (!validPane(id)) return false;
+  try {
+    const t = execFileSync('tmux', ['capture-pane', '-p', '-t', id], { encoding: 'utf8', maxBuffer: 2_000_000 });
+    return MENU_RE.some((re) => re.test(t));
+  } catch { return false; }
+}

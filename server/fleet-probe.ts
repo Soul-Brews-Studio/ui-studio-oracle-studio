@@ -9,6 +9,7 @@ import { homedir, hostname } from 'node:os';
 import { join } from 'node:path';
 import { parseWindow } from '../src/lib/role-costume';
 import { contextForCwd } from './context';
+import { paneNeedsInput } from './pane-io';
 import type { FleetState, FleetAgent, FleetTeam, FleetRoad, AgentStatus } from '../src/lib/fleet';
 
 const SEP = '<|FLEET|>'; // printable token — safe vs. titles (spaces / Thai / punctuation)
@@ -128,7 +129,9 @@ export async function getFleetState(): Promise<FleetState> {
       (!!rest.label && rest.label !== 'oracle' && (known.has(rest.label) || (slugCount.get(rest.label) ?? 0) > 1))
     );
     const ctx = rest.status === 'offline' ? null : contextForCwd(cwd);
-    return { ...rest, team: isTeam ? (mappedTeam ?? rest.label) : null, ctxPct: ctx?.pct, ctxModel: ctx?.model };
+    // An idle pane parked on a TUI menu is BLOCKED on a human answer, not just done.
+    const waiting = rest.status === 'idle' ? paneNeedsInput(rest.paneId) : false;
+    return { ...rest, team: isTeam ? (mappedTeam ?? rest.label) : null, ctxPct: ctx?.pct, ctxModel: ctx?.model, waiting };
   });
 
   // Dispatch roads: orchestrator → worker whose slug extends the orchestrator's slug
@@ -180,6 +183,7 @@ export async function getFleetState(): Promise<FleetState> {
     offline: agents.filter((a) => a.status === 'offline').length,
     teams: teams.length,
     agents: agents.length,
+    waiting: agents.filter((a) => a.waiting).length,
   };
 
   return { ts: new Date().toISOString(), host: hostname(), agents, teams, roads, counts };

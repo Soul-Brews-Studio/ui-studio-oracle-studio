@@ -42,6 +42,12 @@ export function Town() {
   return (
     <div className="px-3 py-3">
       <div className="flex flex-wrap items-center gap-2 mb-2">
+        {c.waiting > 0 && (
+          <span className="town-wait-chip inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px]"
+            style={{ background: '#fbbf2422', color: '#fbbf24', border: '1px solid #fbbf2466' }}>
+            🔔 <span className="font-bold">{c.waiting}</span> waiting on you
+          </span>
+        )}
         <Chip dot="#4ade80" label="working" value={c.working} />
         <Chip dot="#fbbf24" label="asleep" value={c.idle} />
         <Chip dot="#555" label="offline" value={c.offline} />
@@ -82,7 +88,7 @@ export function Town() {
         </div>
       )}
 
-      {selected && <AgentChat agent={selected} onClose={() => setSelectedId(null)} />}
+      {selected && <AgentChat key={selected.id} agent={selected} onClose={() => setSelectedId(null)} />}
       {showNew && <NewAgent onClose={() => setShowNew(false)} />}
 
       {loading && !state.agents.length && (

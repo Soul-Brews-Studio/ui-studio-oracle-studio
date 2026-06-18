@@ -26,8 +26,8 @@ export function AgentTile({ agent, onSelect, ring }: Props) {
       className={`town-${agent.status} relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 border cursor-pointer`}
       style={{
         background: '#0f0f14',
-        borderColor: ring ?? 'rgba(255,255,255,0.08)',
-        boxShadow: ring ? `0 0 0 1px ${ring}, 0 0 10px ${ring}55` : undefined,
+        borderColor: agent.waiting ? '#fbbf24' : (ring ?? 'rgba(255,255,255,0.08)'),
+        boxShadow: agent.waiting ? '0 0 0 1px #fbbf24, 0 0 10px #fbbf2455' : ring ? `0 0 0 1px ${ring}, 0 0 10px ${ring}55` : undefined,
         opacity: agent.status === 'offline' ? 0.5 : 1,
         minWidth: 150,
         maxWidth: 230,
@@ -65,8 +65,10 @@ export function AgentTile({ agent, onSelect, ring }: Props) {
           className="rounded-full"
           style={{ width: 8, height: 8, background: dot, boxShadow: agent.status === 'working' ? `0 0 6px ${dot}` : undefined }}
         />
-        {agent.status === 'idle' && <span className="town-zzz text-[9px] leading-none text-white/45">z</span>}
-        {agent.status === 'working' && <span className="text-[8px] font-mono leading-none text-white/45">{agent.glyph || '•'}</span>}
+        {agent.waiting ? <span className="text-[11px] leading-none" title="waiting for your input">🔔</span>
+          : agent.status === 'idle' ? <span className="town-zzz text-[9px] leading-none text-white/45">z</span>
+          : agent.status === 'working' ? <span className="text-[8px] font-mono leading-none text-white/45">{agent.glyph || '•'}</span>
+          : null}
       </div>
     </div>
   );

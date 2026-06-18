@@ -33,7 +33,7 @@ export function fleetTownPlugin(): Plugin {
         catch (e) {
           json(res, {
             ts: new Date().toISOString(), host: '', agents: [], teams: [], roads: [],
-            counts: { working: 0, idle: 0, offline: 0, teams: 0, agents: 0 },
+            counts: { working: 0, idle: 0, offline: 0, teams: 0, agents: 0, waiting: 0 },
             error: (e as Error).message,
           });
         }

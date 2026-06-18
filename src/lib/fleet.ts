@@ -20,6 +20,7 @@ export interface FleetAgent {
   isOrchestrator: boolean;
   ctxPct?: number;     // context window REMAINING (0–100), like brewbot /ctx
   ctxModel?: string;   // model id behind that context window
+  waiting?: boolean;   // parked on a TUI menu, blocking on a human answer
 }
 
 export interface FleetTeam {
@@ -41,6 +42,7 @@ export interface FleetCounts {
   offline: number;
   teams: number;
   agents: number;
+  waiting: number;
 }
 
 export interface FleetState {
@@ -55,7 +57,7 @@ export interface FleetState {
 
 export const EMPTY_FLEET: FleetState = {
   ts: '', host: '', agents: [], teams: [], roads: [],
-  counts: { working: 0, idle: 0, offline: 0, teams: 0, agents: 0 },
+  counts: { working: 0, idle: 0, offline: 0, teams: 0, agents: 0, waiting: 0 },
 };
 
 // Dedicated path (NOT under /api) so Vite's /api→:47778 proxy never intercepts it,
