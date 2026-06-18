@@ -3,6 +3,7 @@
 // offline. Districts/plots are fenced zones on a grass map; dispatch roads link
 // orchestrators to the workers they spawned. Same /__fleet/state data as the list view.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { FleetState, FleetAgent } from '../../lib/fleet';
 import { groupTown } from '../../lib/town-group';
 import { buildStage } from '../../lib/town-stage';
@@ -13,6 +14,7 @@ interface Actor {
   id: string; x: number; y: number; tx: number; ty: number;
   dir: number; frame: number; frameT: number; waitT: number;
   status: string; charIndex: number; home: { x: number; y: number; w: number; h: number };
+  pinned?: boolean; // dragged to a fixed spot — stops wandering / re-clamping
 }
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
@@ -31,6 +33,37 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
   const stage = useMemo(() => buildStage(districts, width), [districts, width]);
   const actors = useRef<Map<string, Actor>>(new Map());
   const els = useRef<Map<string, HTMLDivElement>>(new Map());
+  const stageRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ id: string; sx: number; sy: number; moved: boolean } | null>(null);
+
+  // Drag a sprite to reposition it (separate overlapping agents); a no-move
+  // press is treated as a click → open the chat. Dragged actors are pinned.
+  const onDown = (e: ReactPointerEvent<HTMLDivElement>, a: FleetAgent) => {
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag.current = { id: a.id, sx: e.clientX, sy: e.clientY, moved: false };
+  };
+  const onMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d) return;
+    if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) return;
+    d.moved = true;
+    const act = actors.current.get(d.id);
+    const st = stageRef.current;
+    if (!act || !st) return;
+    const r = st.getBoundingClientRect();
+    act.pinned = true;
+    act.x = clamp(e.clientX - r.left - SPRITE / 2, 0, Math.max(0, r.width - SPRITE));
+    act.y = clamp(e.clientY - r.top - SPRITE / 2, 0, Math.max(0, r.height - SPRITE));
+    const el = els.current.get(d.id);
+    if (el) el.style.transform = `translate(${act.x}px, ${act.y}px)`;
+  };
+  const onUp = (e: ReactPointerEvent<HTMLDivElement>, a: FleetAgent) => {
+    const d = drag.current;
+    drag.current = null;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    if (d && d.id === a.id && !d.moved) onSelect(a); // click, not a drag
+  };
 
   // Fill the available width — the walking area grows with the viewport.
   useEffect(() => {
@@ -62,9 +95,11 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
         // else a stale target may sit outside the new home and pin the sprite to a wall.
         const moved = act.home.x !== home.x || act.home.y !== home.y || act.home.w !== home.w || act.home.h !== home.h;
         act.status = a.status; act.home = home; act.charIndex = charIndexFor(a.role);
-        act.x = clamp(act.x, home.x, home.x + Math.max(0, home.w - SPRITE));
-        act.y = clamp(act.y, home.y, home.y + Math.max(0, home.h - SPRITE));
-        if (moved) pickTarget(act);
+        if (!act.pinned) {
+          act.x = clamp(act.x, home.x, home.x + Math.max(0, home.w - SPRITE));
+          act.y = clamp(act.y, home.y, home.y + Math.max(0, home.h - SPRITE));
+          if (moved) pickTarget(act);
+        }
       }
     }
     for (const id of [...actors.current.keys()]) if (!live.has(id)) { actors.current.delete(id); els.current.delete(id); }
@@ -78,7 +113,7 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
       for (const act of actors.current.values()) {
         const el = els.current.get(act.id);
         if (!el) continue;
-        if (act.status === 'working') {
+        if (act.status === 'working' && !act.pinned) {
           if (act.waitT > 0) { act.waitT -= dt; act.frame = 0; }
           else {
             const dx = act.tx - act.x, dy = act.ty - act.y;
@@ -118,7 +153,7 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
 
   return (
     <div ref={wrapRef} className="w-full">
-    <div className="town-stage" style={{ width: stage.width, height: stage.height }}>
+    <div ref={stageRef} className="town-stage" style={{ width: stage.width, height: stage.height }}>
       <svg className="absolute inset-0 pointer-events-none" width={stage.width} height={stage.height}>
         {state.roads.map((r) => {
           // skip roads inside one cluster (lead + workers already sit together)
@@ -153,16 +188,18 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
             key={a.id}
             ref={(el) => { if (el) els.current.set(a.id, el); else els.current.delete(a.id); }}
             className={`town-actor town-actor-${a.status}${a.waiting ? ' town-actor-wait' : ''}`}
-            onClick={() => onSelect(a)}
+            onPointerDown={(e) => onDown(e, a)}
+            onPointerMove={onMove}
+            onPointerUp={(e) => onUp(e, a)}
             style={{
               width: SPRITE, height: SPRITE,
-              cursor: 'pointer',
+              cursor: 'grab', touchAction: 'none',
               backgroundImage: `url(${SHEET_URL})`,
               backgroundSize: `${SHEET_W}px ${SHEET_H}px`,
               backgroundPosition: bgPos(charIndexFor(a.role), 0, 0),
               transform: `translate(${p.home.x}px, ${p.home.y}px)`,
             }}
-            title={`${a.windowName}\n${a.task || '—'}\n(click to open session)`}
+            title={`${a.windowName}\n${a.task || '—'}\n(drag to move · click to open session)`}
           >
             {a.isOrchestrator && <span className="town-crown">👑</span>}
             <span className="town-nametag" style={{ borderColor: cos.color }}>
