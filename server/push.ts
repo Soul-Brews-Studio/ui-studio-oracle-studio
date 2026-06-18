@@ -18,9 +18,11 @@ const DIR = join(homedir(), '.fleet-town');
 const VAPID_FILE = join(DIR, 'vapid.json');
 const SUBS_FILE = join(DIR, 'push-subs.json');
 
-interface Prefs { teamIdle: boolean; waiting: boolean; teamsOff: string[]; agentsOff: string[] }
+// teamsOff = opt-OUT (teams alert by default); agentsOn = opt-IN (no agent alerts
+// until explicitly enabled — owner wants needs-input off for everyone by default).
+interface Prefs { teamIdle: boolean; waiting: boolean; teamsOff: string[]; agentsOn: string[] }
 interface Sub { endpoint: string; sub: webpush.PushSubscription; prefs: Prefs }
-const DEFAULT_PREFS: Prefs = { teamIdle: true, waiting: true, teamsOff: [], agentsOff: [] };
+const DEFAULT_PREFS: Prefs = { teamIdle: true, waiting: true, teamsOff: [], agentsOn: [] };
 
 function load<T>(file: string, fallback: T): T {
   try { return JSON.parse(readFileSync(file, 'utf8')) as T; } catch { return fallback; }
@@ -133,7 +135,7 @@ async function tick(getState: () => Promise<FleetState>) {
   for (const a of state.agents) if (a.waiting) {
     waitingNow.add(a.id);
     if (prevWaiting.has(a.id)) continue;
-    for (const s of subs) if (s.prefs.waiting && !(s.prefs.agentsOff || []).includes(a.id)) {
+    for (const s of subs) if (s.prefs.waiting && (s.prefs.agentsOn || []).includes(a.id)) {
       void send(s, { title: `🔔 ${named(a)} needs input`, body: 'Waiting at a TUI menu — tap to answer', tag: `wait-${a.id}`, url: '/town', sticky: true });
     }
   }

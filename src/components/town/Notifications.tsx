@@ -3,8 +3,9 @@
 // closed: whole-team-idle (per team) and an agent waiting for input (per agent).
 import { useEffect, useState } from 'react';
 
-interface Prefs { teamIdle: boolean; waiting: boolean; teamsOff: string[]; agentsOff: string[] }
-const DEFAULT: Prefs = { teamIdle: true, waiting: true, teamsOff: [], agentsOff: [] };
+// teamsOff = opt-OUT (teams on by default); agentsOn = opt-IN (agents off by default).
+interface Prefs { teamIdle: boolean; waiting: boolean; teamsOff: string[]; agentsOn: string[] }
+const DEFAULT: Prefs = { teamIdle: true, waiting: true, teamsOff: [], agentsOn: [] };
 const LS = 'fleet-notif-prefs';
 
 const hasWin = typeof window !== 'undefined';
@@ -43,7 +44,7 @@ export function Notifications({ teams, agents }: { teams: { key: string; name: s
     localStorage.setItem(LS, JSON.stringify(next));
     if (endpoint) void post('/__fleet/push/prefs', { endpoint, prefs: next });
   };
-  const toggleIn = (list: 'teamsOff' | 'agentsOff', key: string) => {
+  const toggleIn = (list: 'teamsOff' | 'agentsOn', key: string) => {
     const cur = prefs[list];
     const next = cur.includes(key) ? cur.filter((x) => x !== key) : [...cur, key];
     syncPrefs({ ...prefs, [list]: next });
@@ -131,9 +132,9 @@ export function Notifications({ teams, agents }: { teams: { key: string; name: s
             {supported && on && (
               <>
                 <Section title="💤 Team idle" master={prefs.teamIdle} onMaster={(v) => syncPrefs({ ...prefs, teamIdle: v })}
-                  items={teams} off={prefs.teamsOff} onToggle={(k) => toggleIn('teamsOff', k)} empty="no active teams" />
+                  items={teams} isOn={(k) => !prefs.teamsOff.includes(k)} onToggle={(k) => toggleIn('teamsOff', k)} empty="no active teams" />
                 <Section title="🔔 Needs input" master={prefs.waiting} onMaster={(v) => syncPrefs({ ...prefs, waiting: v })}
-                  items={agents} off={prefs.agentsOff} onToggle={(k) => toggleIn('agentsOff', k)} empty="no agents" />
+                  items={agents} isOn={(k) => prefs.agentsOn.includes(k)} onToggle={(k) => toggleIn('agentsOn', k)} empty="no agents" hint="off by default — tick agents to alert" />
                 <div className="mt-2 flex gap-2 border-t border-white/10 pt-2">
                   <button onClick={sendTest} className="flex-1 rounded-lg py-1 text-[11px]" style={{ background: '#ffffff10', color: '#bbb' }}>Send test</button>
                   <button onClick={disable} disabled={busy} className="flex-1 rounded-lg py-1 text-[11px]" style={{ background: '#f8717118', color: '#fca5a5' }}>Turn off</button>
@@ -149,19 +150,20 @@ export function Notifications({ teams, agents }: { teams: { key: string; name: s
 }
 
 // A toggle group: a master on/off plus a scrollable per-item opt-out list.
-function Section({ title, master, onMaster, items, off, onToggle, empty }: {
+function Section({ title, master, onMaster, items, isOn, onToggle, empty, hint }: {
   title: string; master: boolean; onMaster: (v: boolean) => void;
-  items: { key?: string; id?: string; name: string }[]; off: string[]; onToggle: (key: string) => void; empty: string;
+  items: { key?: string; id?: string; name: string }[]; isOn: (key: string) => boolean; onToggle: (key: string) => void; empty: string; hint?: string;
 }) {
   return (
     <div className="mt-2 border-t border-white/10 pt-2">
       <Row label={title} bold checked={master} onChange={onMaster} />
       {master && (
         <div className="mt-1 max-h-36 overflow-auto pl-1">
+          {hint && <p className="text-[10px] text-white/35 mb-0.5">{hint}</p>}
           {items.length === 0 && <p className="text-[11px] text-white/35">{empty}</p>}
           {items.map((it) => {
             const k = (it.key ?? it.id) as string;
-            return <Row key={k} label={it.name} small checked={!off.includes(k)} onChange={() => onToggle(k)} />;
+            return <Row key={k} label={it.name} small checked={isOn(k)} onChange={() => onToggle(k)} />;
           })}
         </div>
       )}
