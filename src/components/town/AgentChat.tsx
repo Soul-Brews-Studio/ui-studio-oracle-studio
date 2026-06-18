@@ -49,6 +49,13 @@ export function AgentChat({ agent, onClose }: { agent: FleetAgent; onClose: () =
     try { if (input) localStorage.setItem(draftKey, input); else localStorage.removeItem(draftKey); } catch { /* ignore */ }
   }, [input, draftKey]);
 
+  // Esc closes the window. (To send Escape to the agent's TUI menu, use the esc nav button.)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const refreshSoon = (ms: number) => setTimeout(async () => {
     try { setText(await load()); } catch { /* next poll */ }
   }, ms);
@@ -84,9 +91,9 @@ export function AgentChat({ agent, onClose }: { agent: FleetAgent; onClose: () =
   const keyBtnStyle = { background: '#1a1a22', border: '1px solid rgba(255,255,255,0.12)', color: '#cdd2cd' };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-3" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 sm:p-6" onClick={onClose}>
       <div
-        className="flex flex-col w-[97vw] h-[94vh] rounded-xl border overflow-hidden shadow-2xl"
+        className="flex flex-col w-[92vw] h-[88vh] rounded-xl border overflow-hidden shadow-2xl"
         style={{ background: '#0c0c12', borderColor: cos.color + '66' }}
         onClick={(e) => e.stopPropagation()}
       >
