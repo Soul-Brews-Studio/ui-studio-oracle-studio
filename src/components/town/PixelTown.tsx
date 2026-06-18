@@ -9,6 +9,7 @@ import { groupTown } from '../../lib/town-group';
 import { buildStage } from '../../lib/town-stage';
 import { costumeFor, charIndexFor, ctxColor, activityEmoji } from '../../lib/role-costume';
 import { SHEET_URL, SHEET_W, SHEET_H, SPRITE, bgPos } from '../../lib/sprite';
+import { buildProps } from '../../lib/town-props';
 
 interface Actor {
   id: string; x: number; y: number; tx: number; ty: number;
@@ -31,10 +32,16 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1180);
   const stage = useMemo(() => buildStage(districts, width), [districts, width]);
+  const props = useMemo(() => buildProps(stage), [stage]);
   const actors = useRef<Map<string, Actor>>(new Map());
   const els = useRef<Map<string, HTMLDivElement>>(new Map());
   const stageRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ id: string; sx: number; sy: number; moved: boolean } | null>(null);
+  // Animated decorations (campfire/windmill/sparkle): the rAF cycles their frames.
+  const propEls = useRef<Map<string, HTMLDivElement>>(new Map());
+  const animState = useRef<Map<string, { frame: number; t: number }>>(new Map());
+  const animsRef = useRef(props.anims);
+  const reduceRef = useRef(false);
 
   // Drag a sprite to reposition it (separate overlapping agents); a no-move
   // press is treated as a click → open the chat. Dragged actors are pinned.
@@ -105,8 +112,18 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
     for (const id of [...actors.current.keys()]) if (!live.has(id)) { actors.current.delete(id); els.current.delete(id); }
   }, [stage, state]);
 
-  // Single rAF drives every sprite (wander + walk-cycle), mutating the DOM directly.
+  // Keep the animated-prop frame counters in sync with the current placements.
   useEffect(() => {
+    animsRef.current = props.anims;
+    const live = new Set(props.anims.map((a) => a.id));
+    for (const id of [...animState.current.keys()]) if (!live.has(id)) { animState.current.delete(id); propEls.current.delete(id); }
+    for (const a of props.anims) if (!animState.current.has(a.id)) animState.current.set(a.id, { frame: 0, t: 0 });
+  }, [props]);
+
+  // Single rAF drives every sprite (wander + walk-cycle) AND the ambient prop
+  // frame cycling, mutating the DOM directly.
+  useEffect(() => {
+    reduceRef.current = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let raf = 0; let last = 0;
     const tick = (t: number) => {
       const dt = last ? Math.min(60, t - last) : 16; last = t;
@@ -140,6 +157,20 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
         }
         el.style.transform = `translate(${act.x}px, ${act.y}px)`;
       }
+      // Advance the animated decorations (frozen when reduced-motion is set).
+      for (const a of animsRef.current) {
+        const el = propEls.current.get(a.id);
+        const st = animState.current.get(a.id);
+        if (!el || !st) continue;
+        if (!reduceRef.current) {
+          st.t += dt;
+          const period = 1000 / a.spec.fps;
+          if (st.t >= period) { st.t -= period; st.frame = (st.frame + 1) % a.spec.frames.length; }
+        }
+        const k = a.spec.size / a.spec.fw;
+        const [fx, fy] = a.spec.frames[st.frame];
+        el.style.backgroundPosition = `${-fx * k}px ${-fy * k}px`;
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -154,6 +185,28 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
   return (
     <div ref={wrapRef} className="w-full">
     <div ref={stageRef} className="town-stage" style={{ width: stage.width, height: stage.height }}>
+      {/* Ambient scenery — pure decoration on the grass, behind every agent. */}
+      {props.decos.map((d) => (
+        <div key={d.id} className="town-deco" style={{
+          width: d.spec.size, height: d.spec.size,
+          backgroundImage: `url(${d.spec.url})`, backgroundSize: `${d.spec.size}px ${d.spec.size}px`,
+          transform: `translate(${d.x}px, ${d.y}px)`,
+        }} />
+      ))}
+      {props.anims.map((a) => {
+        const k = a.spec.size / a.spec.fw;
+        return (
+          <div key={a.id} className="town-anim"
+            ref={(el) => { if (el) propEls.current.set(a.id, el); else propEls.current.delete(a.id); }}
+            style={{
+              width: a.spec.size, height: a.spec.size,
+              backgroundImage: `url(${a.spec.url})`,
+              backgroundSize: `${a.spec.sheetW * k}px ${a.spec.sheetH * k}px`,
+              transform: `translate(${a.x}px, ${a.y}px)`,
+            }} />
+        );
+      })}
+
       <svg className="absolute inset-0 pointer-events-none" width={stage.width} height={stage.height}>
         {state.roads.map((r) => {
           // skip roads inside one cluster (lead + workers already sit together)
