@@ -16,6 +16,11 @@ are trimmed crops of `TX Plant with Shadow` / `TX Props with Shadow` (transparen
 backgrounds with baked shadows). Used here for a single internal/personal tool,
 not redistributed or resold as an asset pack.
 
+## Characters — ai-town `32x32folk` (ansimuz, CC0), recolored
+`folk.png` is the 8 ai-town folk characters, hue-shifted into 4 palettes
+(orig / +60 / +140 / +220) stacked into 32 sprites so each agent role gets a
+distinct body+colour. CC0 permits this derivative.
+
 ## Animated objects — ai-town (ansimuz "Tiny RPG Forest", CC0)
 `campfire.png`, `windmill.png`, `sparkle.png` are from
 [a16z-infra/ai-town](https://github.com/a16z-infra/ai-town) (code MIT), art from
