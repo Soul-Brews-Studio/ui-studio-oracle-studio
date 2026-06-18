@@ -100,14 +100,14 @@ const named = (a: { role?: string; label?: string }) =>
 // Campaign/team clusters (per town-group) that are FULLY idle. A "team" is the
 // orchestrator-led cluster — keyed by cluster key and named by its orchestrator,
 // NOT a bare maw-team name (owner: the team == the orchestrator that leads it).
-function idleClusters(state: FleetState): Map<string, string> {
-  const out = new Map<string, string>();
+function idleClusters(state: FleetState): Map<string, { name: string; members: string[] }> {
+  const out = new Map<string, { name: string; members: string[] }>();
   for (const d of groupTown(state)) {
     for (const c of d.clusters) {
       if (c.kind === 'commons') continue;
-      const members = c.lead ? [c.lead, ...c.members] : c.members;
-      if (members.length > 0 && members.every((m) => m.status === 'idle')) {
-        out.set(c.key, c.lead ? named(c.lead) : c.label);
+      const all = c.lead ? [c.lead, ...c.members] : c.members;
+      if (all.length > 0 && all.every((m) => m.status === 'idle')) {
+        out.set(c.key, { name: c.lead ? named(c.lead) : c.label, members: all.map(named) });
       }
     }
   }
@@ -119,10 +119,12 @@ async function tick(getState: () => Promise<FleetState>) {
   try { state = await getState(); } catch { return; }
 
   const idle = idleClusters(state);
-  for (const [key, name] of idle) {
+  for (const [key, info] of idle) {
     if (prevIdleTeams.has(key)) continue;                        // already alerted
+    const shown = info.members.slice(0, 4).join(', ');
+    const more = info.members.length > 4 ? `, +${info.members.length - 4} more` : '';
     for (const s of subs) if (s.prefs.teamIdle && !s.prefs.teamsOff.includes(key)) {
-      void send(s, { title: '💤 Team idle', body: `${name} — every agent is asleep`, tag: `team-${key}`, renotify: true });
+      void send(s, { title: `💤 ${info.name} — whole team idle`, body: `All asleep: ${shown}${more}`, tag: `team-${key}`, renotify: true });
     }
   }
   prevIdleTeams = new Set(idle.keys());
@@ -132,7 +134,7 @@ async function tick(getState: () => Promise<FleetState>) {
     waitingNow.add(a.id);
     if (prevWaiting.has(a.id)) continue;
     for (const s of subs) if (s.prefs.waiting && !(s.prefs.agentsOff || []).includes(a.id)) {
-      void send(s, { title: '🔔 Needs your input', body: `${named(a)} is waiting at a menu`, tag: `wait-${a.id}`, url: '/town', sticky: true });
+      void send(s, { title: `🔔 ${named(a)} needs input`, body: 'Waiting at a TUI menu — tap to answer', tag: `wait-${a.id}`, url: '/town', sticky: true });
     }
   }
   prevWaiting = waitingNow;
