@@ -93,8 +93,16 @@ export async function handlePush(req: Request, p: string): Promise<Response | nu
 }
 
 // ---- detection loop ----
-let prevIdleTeams = new Set<string>();
-let prevWaiting = new Set<string>();
+// Alerts are SUSTAINED, not edge-triggered: a condition must hold continuously
+// for a hold window before firing, so a brief idle blip (an agent that pauses
+// between steps then resumes) never raises a false alarm. The timer resets the
+// instant the condition clears, and each streak alerts at most once.
+const IDLE_HOLD_MS = 90_000; // whole team must stay idle this long
+const WAIT_HOLD_MS = 20_000; // an agent must stay at a menu this long
+const idleSince = new Map<string, number>();
+const idleAlerted = new Set<string>();
+const waitSince = new Map<string, number>();
+const waitAlerted = new Set<string>();
 
 const named = (a: { role?: string; label?: string }) =>
   `${a.role || 'orchestrator'}${a.label && a.label !== 'oracle' ? '·' + a.label : ''}`;
@@ -119,27 +127,36 @@ function idleClusters(state: FleetState): Map<string, { name: string; members: s
 async function tick(getState: () => Promise<FleetState>) {
   let state: FleetState;
   try { state = await getState(); } catch { return; }
+  const now = Date.now();
 
+  // Team idle — fire only after IDLE_HOLD_MS of continuous whole-team idleness.
   const idle = idleClusters(state);
+  for (const key of [...idleSince.keys()]) if (!idle.has(key)) { idleSince.delete(key); idleAlerted.delete(key); }
   for (const [key, info] of idle) {
-    if (prevIdleTeams.has(key)) continue;                        // already alerted
+    let since = idleSince.get(key);
+    if (since === undefined) { since = now; idleSince.set(key, now); }
+    if (now - since < IDLE_HOLD_MS || idleAlerted.has(key)) continue;
+    idleAlerted.add(key);
     const shown = info.members.slice(0, 4).join(', ');
     const more = info.members.length > 4 ? `, +${info.members.length - 4} more` : '';
     for (const s of subs) if (s.prefs.teamIdle && !s.prefs.teamsOff.includes(key)) {
       void send(s, { title: `💤 ${info.name} — whole team idle`, body: `All asleep: ${shown}${more}`, tag: `team-${key}`, renotify: true });
     }
   }
-  prevIdleTeams = new Set(idle.keys());
 
-  const waitingNow = new Set<string>();
-  for (const a of state.agents) if (a.waiting) {
-    waitingNow.add(a.id);
-    if (prevWaiting.has(a.id)) continue;
+  // Agent waiting at a TUI menu — fire only after WAIT_HOLD_MS of continuous wait.
+  const waitingNow = new Set(state.agents.filter((a) => a.waiting).map((a) => a.id));
+  for (const id of [...waitSince.keys()]) if (!waitingNow.has(id)) { waitSince.delete(id); waitAlerted.delete(id); }
+  for (const a of state.agents) {
+    if (!a.waiting) continue;
+    let since = waitSince.get(a.id);
+    if (since === undefined) { since = now; waitSince.set(a.id, now); }
+    if (now - since < WAIT_HOLD_MS || waitAlerted.has(a.id)) continue;
+    waitAlerted.add(a.id);
     for (const s of subs) if (s.prefs.waiting && (s.prefs.agentsOn || []).includes(a.id)) {
       void send(s, { title: `🔔 ${named(a)} needs input`, body: 'Waiting at a TUI menu — tap to answer', tag: `wait-${a.id}`, url: '/town', sticky: true });
     }
   }
-  prevWaiting = waitingNow;
 }
 
 export function startNotifyLoop(getState: () => Promise<FleetState>, ms = 8000) {
