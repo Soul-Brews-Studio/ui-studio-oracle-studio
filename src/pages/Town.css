@@ -35,6 +35,15 @@
   .town-road { animation: none; }
 }
 
+/* Mobile: shrink the labels/badges so crowded zones stay readable on a phone. */
+@media (max-width: 520px) {
+  .town-nametag { font-size: 8px; padding: 0 2px; top: -11px; max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+  .town-bubble { font-size: 11px; top: 0; right: -4px; }
+  .town-crown { font-size: 11px; top: -22px; }
+  .town-district-label { font-size: 12px; }
+  .town-zone-label { font-size: 10px; }
+}
+
 /* ---- Pixel map view (ai-town style) ---- */
 .town-stage {
   position: relative;

@@ -29,13 +29,23 @@ const LABEL_H = 22;    // zone label strip
 const GAP = 22;
 const HEADER_H = 30;
 
-function zoneSize(n: number) {
-  const cols = Math.max(1, Math.min(Math.max(n, 1), Math.ceil(Math.sqrt(Math.max(n, 1) * 1.6))));
+// A zone's column count never exceeds `maxCols`, so a crowded zone (e.g. a big
+// commons) wraps to more ROWS instead of overflowing the viewport — key for mobile.
+function zoneSize(n: number, cell: number, pad: number, maxCols: number) {
+  const cols = Math.min(maxCols, Math.max(1, Math.min(Math.max(n, 1), Math.ceil(Math.sqrt(Math.max(n, 1) * 1.6)))));
   const rows = Math.max(2, Math.ceil(Math.max(n, 1) / cols)); // ≥2 rows → vertical room to roam
-  return { w: cols * CELL + PAD * 2, h: rows * CELL + PAD * 2 + LABEL_H };
+  return { w: cols * cell + pad * 2, h: rows * cell + pad * 2 + LABEL_H };
 }
 
 export function buildStage(districts: TownDistrict[], stageWidth = 1180): Stage {
+  // Responsive: shrink the cell/padding on narrow (mobile) widths.
+  const narrow = stageWidth < 520;
+  const cell = narrow ? 92 : CELL;
+  const pad = narrow ? 12 : PAD;
+  const gap = narrow ? 10 : GAP;
+  const M = 8; // stage left/right margin
+  const maxCols = Math.max(1, Math.floor((stageWidth - M * 2 - pad * 2) / cell));
+
   const zones: StageZone[] = [];
   const headers: StageHeader[] = [];
   const placements: Record<string, Placement> = {};
@@ -45,19 +55,19 @@ export function buildStage(districts: TownDistrict[], stageWidth = 1180): Stage 
     headers.push({ session: d.session, label: d.session, y, counts: d.counts });
     y += HEADER_H;
 
-    let x = 8, rowH = 0;
+    let x = M, rowH = 0;
     for (const c of d.clusters) {
       const ids = c.lead ? [c.lead.id, ...c.members.map((m) => m.id)] : c.members.map((m) => m.id);
       if (!ids.length) continue;
-      const sz = zoneSize(ids.length);
-      if (x + sz.w > stageWidth && x > 8) { x = 8; y += rowH + GAP; rowH = 0; }
+      const sz = zoneSize(ids.length, cell, pad, maxCols);
+      if (x + sz.w > stageWidth && x > M) { x = M; y += rowH + gap; rowH = 0; }
       zones.push({ id: c.key, kind: c.kind, label: c.label, known: c.known, leadId: c.lead?.id, session: d.session, x, y, w: sz.w, h: sz.h, agentIds: ids });
-      const home = { x: x + PAD, y: y + PAD + LABEL_H, w: sz.w - PAD * 2, h: sz.h - PAD * 2 - LABEL_H };
+      const home = { x: x + pad, y: y + pad + LABEL_H, w: sz.w - pad * 2, h: sz.h - pad * 2 - LABEL_H };
       for (const id of ids) placements[id] = { home };
-      x += sz.w + GAP;
+      x += sz.w + gap;
       rowH = Math.max(rowH, sz.h);
     }
-    y += rowH + Math.round(GAP * 1.6);
+    y += rowH + Math.round(gap * 1.6);
   }
 
   return { width: stageWidth, height: Math.ceil(y) + 8, zones, headers, placements };
