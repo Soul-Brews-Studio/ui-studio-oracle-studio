@@ -6,6 +6,8 @@ import type { ReactNode } from 'react';
 import type { FleetAgent } from '../../lib/fleet';
 import { capturePane, fetchTranscript, sendToPane, sendKeyToPane, closePaneSession } from '../../lib/fleet';
 import { costumeFor, ctxColor } from '../../lib/role-costume';
+import { loadPresets, savePresets, PROMPT_MARK, type ChatPreset } from '../../lib/presets';
+import { PresetManager } from './PresetManager';
 
 const NAV_KEYS: Array<[string, string]> = [['↑', 'up'], ['↓', 'down'], ['←', 'left'], ['→', 'right']];
 type Tab = 'history' | 'live';
@@ -40,6 +42,8 @@ export function AgentChat({ agent, onClose }: { agent: FleetAgent; onClose: () =
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [presets, setPresets] = useState<ChatPreset[]>(loadPresets);
+  const [managing, setManaging] = useState(false);
   const preRef = useRef<HTMLPreElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const stick = useRef(true);
@@ -102,6 +106,22 @@ export function AgentChat({ agent, onClose }: { agent: FleetAgent; onClose: () =
       stick.current = true;
       refreshSoon(250);
     } catch (e) { setErr((e as Error).message); }
+  };
+
+  // Drop a preset into the input box; "<prompt>" marks where the caret waits.
+  const applyPreset = (tpl: string) => {
+    const idx = tpl.indexOf(PROMPT_MARK);
+    const value = idx >= 0 ? tpl.slice(0, idx) + tpl.slice(idx + PROMPT_MARK.length) : tpl;
+    const caret = idx >= 0 ? idx : value.length;
+    setInput(value);
+    setTimeout(() => {
+      const el = taRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(caret, caret);
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+    }, 0);
   };
 
   // Close (kill) the agent's session — two-tap confirm since it's destructive.
@@ -173,6 +193,20 @@ export function AgentChat({ agent, onClose }: { agent: FleetAgent; onClose: () =
           <span className="text-[9px] text-white/30 ml-1">↳ TUI menu keys (no Enter appended)</span>
         </div>
 
+        <div className="flex items-center gap-1 px-2 pt-1.5 flex-wrap">
+          <span className="text-[10px] text-white/30 mr-0.5">⚡</span>
+          {presets.map((p) => (
+            <button key={p.id} onClick={() => applyPreset(p.text)} title={p.text}
+              className="px-2 h-6 rounded text-[11px] max-w-[150px] truncate"
+              style={{ background: '#ffffff0d', border: '1px solid rgba(255,255,255,0.12)', color: '#cbd5e1' }}
+            >{p.name}</button>
+          ))}
+          <button onClick={() => setManaging(true)} title="add / edit / rename presets"
+            className="px-2 h-6 rounded text-[11px]"
+            style={{ background: 'transparent', border: '1px dashed rgba(255,255,255,0.22)', color: '#94a3b8' }}
+          >⚙ edit</button>
+        </div>
+
         <div className="flex items-end gap-2 p-2 border-t border-white/10">
           <button
             onClick={() => send('nudge')}
@@ -207,6 +241,13 @@ export function AgentChat({ agent, onClose }: { agent: FleetAgent; onClose: () =
           >send ⏎</button>
         </div>
       </div>
+      {managing && (
+        <PresetManager
+          presets={presets}
+          onSave={(l) => { setPresets(l); savePresets(l); }}
+          onClose={() => setManaging(false)}
+        />
+      )}
     </div>
   );
 }
