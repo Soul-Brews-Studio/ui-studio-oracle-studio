@@ -21,6 +21,7 @@ export function AgentChat({ agent, onClose }: { agent: FleetAgent; onClose: () =
   const [busy, setBusy] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const preRef = useRef<HTMLPreElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
   const stick = useRef(true);
   const cos = costumeFor(agent.role);
 
@@ -66,6 +67,7 @@ export function AgentChat({ agent, onClose }: { agent: FleetAgent; onClose: () =
     try {
       await sendToPane(agent.paneId, msg);
       setInput('');
+      if (taRef.current) taRef.current.style.height = 'auto'; // collapse the grown textarea
       stick.current = true;
       refreshSoon(450);
     } catch (e) { setErr((e as Error).message); }
@@ -150,7 +152,7 @@ export function AgentChat({ agent, onClose }: { agent: FleetAgent; onClose: () =
           <span className="text-[9px] text-white/30 ml-1">↳ TUI menu keys (no Enter appended)</span>
         </div>
 
-        <div className="flex items-center gap-2 p-2 border-t border-white/10">
+        <div className="flex items-end gap-2 p-2 border-t border-white/10">
           <button
             onClick={() => send('nudge')}
             disabled={busy}
@@ -158,14 +160,23 @@ export function AgentChat({ agent, onClose }: { agent: FleetAgent; onClose: () =
             style={{ background: '#fbbf2422', color: '#fbbf24', border: '1px solid #fbbf2455' }}
             title="send the word 'nudge' + Enter"
           >👉 nudge</button>
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); } }}
-            placeholder={`message ${cos.title}…`}
+          <button
+            onClick={() => send('Please save your last full response verbatim as a GitHub gist — run `gh gist create` (secret) — and reply with ONLY the gist URL. The live pane scrolled past it so I can’t read the long output here.')}
             disabled={busy}
-            className="flex-1 rounded px-2.5 py-1.5 text-[12px] outline-none"
-            style={{ background: '#101018', border: '1px solid rgba(255,255,255,0.12)', color: '#e0e0e0' }}
+            className="px-2.5 py-1.5 rounded text-[12px] shrink-0 disabled:opacity-50"
+            style={{ background: '#818cf822', color: '#a5b4fc', border: '1px solid #818cf855' }}
+            title="ask the agent to save its last long reply as a gh gist and return the link"
+          >📋 gist</button>
+          <textarea
+            ref={taRef}
+            value={input}
+            onChange={(e) => { setInput(e.target.value); const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 140) + 'px'; }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); } }}
+            placeholder={`message ${cos.title}…  ·  Shift+Enter = newline`}
+            disabled={busy}
+            rows={1}
+            className="flex-1 rounded px-2.5 py-1.5 text-[12px] outline-none resize-none leading-snug"
+            style={{ background: '#101018', border: '1px solid rgba(255,255,255,0.12)', color: '#e0e0e0', maxHeight: 140 }}
           />
           <button
             onClick={() => send(input)}

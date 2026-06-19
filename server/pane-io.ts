@@ -15,11 +15,19 @@ export function capturePane(id: string, lines = 3000): string {
   });
 }
 
-/** Type literal text into the pane, then submit with Enter. */
+/** Send text to the pane, then submit with Enter. Multi-line messages go via a
+ *  bracketed paste so newlines are INSERTED into the agent's input (the CLI treats
+ *  it as a paste) instead of submitting each line; single-line keeps the proven
+ *  literal path. */
 export function sendToPane(id: string, text: string): void {
   if (!validPane(id)) throw new Error('bad pane id');
-  const t = (text ?? '').replace(/\r?\n/g, ' ').slice(0, 4000);
-  execFileSync('tmux', ['send-keys', '-t', id, '-l', '--', t]); // -l literal, -- ends opts
+  const t = (text ?? '').slice(0, 8000);
+  if (/\r?\n/.test(t)) {
+    execFileSync('tmux', ['set-buffer', '-b', 'fleetmsg', '--', t]);
+    execFileSync('tmux', ['paste-buffer', '-p', '-d', '-b', 'fleetmsg', '-t', id]); // -p bracketed, -d drop buffer
+  } else {
+    execFileSync('tmux', ['send-keys', '-t', id, '-l', '--', t]); // -l literal, -- ends opts
+  }
   execFileSync('tmux', ['send-keys', '-t', id, 'Enter']);
 }
 
