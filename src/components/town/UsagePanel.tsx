@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react';
 
 interface Win { in: number; out: number; cache: number; msgs: number }
 interface Account {
-  id: string; name: string;
+  name: string;
   auth: { loggedIn?: boolean; authMethod?: string; apiProvider?: string; email?: string; subscriptionType?: string; error?: string };
+  plans: string[];   // plan names that map to this account
   usage: { h5: Win; d1: Win; d7: Win };
-  sharedUsage?: boolean;
 }
 
 // Web/subscription auth (NOT an API key). Browser login = 'claude.ai' (carries
@@ -54,17 +54,16 @@ export function UsagePanel({ onClose }: { onClose: () => void }) {
           <span className="font-semibold text-[14px] text-white/90">📊 Account usage</span>
           <button onClick={onClose} className="text-white/50 hover:text-white/90 text-sm">✕</button>
         </div>
-        <p className="text-[11px] text-white/40 mb-3">Token usage per plan (subscription %-left isn’t exposed by the CLI — this is consumption per window).</p>
+        <p className="text-[11px] text-white/40 mb-3">Per account. Subscription %-left isn’t exposed by the CLI — this is local token consumption (summed across the account’s config-dirs).</p>
         {!accts && <p className="text-[12px] text-white/40 py-6 text-center">loading…</p>}
         {accts && !accts.length && <p className="text-[12px] text-white/40 py-6 text-center">no accounts</p>}
         <div className="flex flex-col gap-3">
-          {(accts || []).map((a) => {
+          {(accts || []).map((a, i) => {
             const web = isWeb(a.auth);
             return (
-              <div key={a.id} className="rounded-lg border border-white/10 p-2.5">
+              <div key={a.auth.email || a.name || i} className="rounded-lg border border-white/10 p-2.5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-[12px] text-white/90">{a.name}</span>
-                  {a.auth.email && <span className="text-[11px] text-white/50 font-mono">{a.auth.email}</span>}
+                  <span className="font-semibold text-[12px] text-white/90 font-mono">{a.auth.email || a.name}</span>
                   {a.auth.subscriptionType && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: '#a78bfa22', color: '#c4b5fd', border: '1px solid #a78bfa55' }}>
                       {a.auth.subscriptionType.toUpperCase()}
@@ -78,8 +77,8 @@ export function UsagePanel({ onClose }: { onClose: () => void }) {
                       : a.auth.loggedIn ? `⚠ ${a.auth.authMethod || 'non-web'}` : '✗ not logged in'}
                   </span>
                 </div>
+                <p className="text-[10px] text-white/40 mt-0.5">plans: {a.plans.join(', ')}</p>
                 {a.auth.error && <p className="text-[10px] text-red-300 mt-1">{a.auth.error}</p>}
-                {a.sharedUsage && <p className="text-[10px] text-amber-300/70 mt-1">⚠ token plan shares the default transcript dir — usage below isn’t isolated to this account</p>}
                 <Windows u={a.usage} />
               </div>
             );

@@ -99,16 +99,38 @@ function tokenUsage(dir: string) {
 let snapshot: unknown[] = [];
 export const getUsageSnapshot = () => snapshot;
 
+const addWin = (a: Win, b: Win): Win => ({ in: a.in + b.in, out: a.out + b.out, cache: a.cache + b.cache, msgs: a.msgs + b.msgs });
+
 function refresh() {
   try {
-    snapshot = loadPlans().map((p) => ({
-      id: p.id, name: p.name,
-      auth: authStatus(p),
-      // Token usage tallies per config-dir. Token-based plans share the default
-      // projects dir (no separate dir), so their window is the shared default —
-      // flagged so the UI can note it isn't plan-isolated.
-      usage: tokenUsage(p.dir || ''),
-      sharedUsage: !!(p.token && !p.dir),
+    // Resolve every plan to its auth identity + the local token usage of its dir.
+    const resolved = loadPlans().map((p) => ({ plan: p, auth: authStatus(p), usage: tokenUsage(p.dir || '') }));
+
+    // Group by ACCOUNT (email) — the user asked for usage PER ACCOUNT, and the
+    // same login across config-dirs shares ONE real subscription quota. Local
+    // transcript usage from each of that account's dirs is summed, so the same
+    // account always shows the same number regardless of how many plans map to
+    // it. Plans that aren't logged in / errored key by plan id so they show alone.
+    const groups = new Map<string, { auth: Record<string, unknown>; plans: string[]; dirs: Set<string>; usage: { h5: Win; d1: Win; d7: Win } }>();
+    for (const r of resolved) {
+      const email = (r.auth.email as string) || '';
+      const key = email || `plan:${r.plan.id}`;
+      let g = groups.get(key);
+      if (!g) { g = { auth: r.auth, plans: [], dirs: new Set(), usage: { h5: zero(), d1: zero(), d7: zero() } }; groups.set(key, g); }
+      g.plans.push(r.plan.name);
+      // Sum each distinct dir once (two plans on the same dir mustn't double-count).
+      const dirKey = r.plan.dir || '~/.claude';
+      if (!g.dirs.has(dirKey)) {
+        g.dirs.add(dirKey);
+        g.usage = { h5: addWin(g.usage.h5, r.usage.h5), d1: addWin(g.usage.d1, r.usage.d1), d7: addWin(g.usage.d7, r.usage.d7) };
+      }
+      if (r.auth.email && !g.auth.email) g.auth = r.auth; // prefer a logged-in identity for the group
+    }
+    snapshot = [...groups.values()].map((g) => ({
+      name: (g.auth.email as string) || g.plans[0],
+      auth: g.auth,
+      plans: g.plans,
+      usage: g.usage,
     }));
   } catch (e) { console.error('[usage] refresh failed', (e as Error).message); }
 }
