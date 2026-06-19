@@ -10,6 +10,7 @@ import { District } from '../components/town/District';
 import { PixelTown } from '../components/town/PixelTown';
 import { AgentChat } from '../components/town/AgentChat';
 import { NewAgent } from '../components/town/NewAgent';
+import { Notifications } from '../components/town/Notifications';
 import './Town.css';
 
 type TownView = 'map' | 'list';
@@ -39,6 +40,18 @@ export function Town() {
   const openAgent = (a: FleetAgent) => setSelectedId(a.id);
 
   const c = state.counts;
+  // Alert "teams" = the town's orchestrator-led clusters (campaign/team), keyed by
+  // cluster + named by the orchestrator — matching how team-idle alerts group.
+  const teamGroups = useMemo(
+    () => districts.flatMap((d) => d.clusters)
+      .filter((c) => c.kind !== 'commons')
+      .map((c) => ({ key: c.key, name: c.lead ? `${c.lead.role}${c.lead.label && c.lead.label !== 'oracle' ? '·' + c.lead.label : ''}` : c.label })),
+    [districts],
+  );
+  const agentList = useMemo(
+    () => state.agents.map((a) => ({ id: a.id, name: `${a.role}${a.label && a.label !== 'oracle' ? '·' + a.label : ''}` })),
+    [state],
+  );
   return (
     <div className="px-3 py-3">
       <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -58,6 +71,7 @@ export function Town() {
             className="px-2.5 py-1 rounded-full text-[11px]"
             style={{ background: '#4ade8022', color: '#4ade80', border: '1px solid #4ade8055' }}
           >➕ new agent</button>
+          <Notifications teams={teamGroups} agents={agentList} />
           <span className="text-[10px] text-white/35 font-mono">{state.host || '…'} · {ago(lastOk)}</span>
           <div className="inline-flex rounded-full border border-white/10 overflow-hidden text-[11px]">
             {(['map', 'list'] as const).map((v) => (
