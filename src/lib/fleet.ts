@@ -125,19 +125,20 @@ export async function closePaneSession(paneId: string): Promise<void> {
 }
 
 /** Roles wakeable via `maw wake` (for the New Agent picker). */
-export async function fetchRoles(): Promise<string[]> {
+export interface AgentPlan { id: string; name: string }
+export async function fetchRoles(): Promise<{ roles: string[]; plans: AgentPlan[] }> {
   const res = await fetch('/__fleet/roles');
   const j = await res.json();
   if (!res.ok || j.error) throw new Error(j.error || `roles ${res.status}`);
-  return (j.roles as string[]) ?? [];
+  return { roles: (j.roles as string[]) ?? [], plans: (j.plans as AgentPlan[]) ?? [] };
 }
 
-/** Spawn a new agent (brewbot /new → maw wake). Returns maw's output text. */
-export async function newAgent(role: string, slug: string): Promise<string> {
+/** Spawn a new agent (brewbot /new → maw wake). `planId` pins a Claude account. */
+export async function newAgent(role: string, slug: string, planId?: string): Promise<string> {
   const res = await fetch('/__fleet/new', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ role, slug }),
+    body: JSON.stringify({ role, slug, planId }),
   });
   const j = await res.json().catch(() => ({}));
   if (!res.ok || j.error) throw new Error(j.error || `new ${res.status}`);

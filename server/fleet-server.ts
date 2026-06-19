@@ -15,6 +15,7 @@ import { getFleetState } from './fleet-probe';
 import { capturePane, sendToPane, sendKey, closePane } from './pane-io';
 import { transcriptFor } from './transcript';
 import { listRoles, spawnAgent } from './agents';
+import { listPlans } from './usage';
 import { handlePush, startNotifyLoop } from './push';
 import { getEnvStatus, startEnvProbe } from './env-probe';
 import { getUsageSnapshot, startUsage } from './usage';
@@ -99,13 +100,13 @@ const server = Bun.serve({
       } catch (e) { return Response.json({ error: (e as Error).message }, { status: 400 }); }
     }
     if (p === '/__fleet/roles') {
-      try { return Response.json({ roles: listRoles() }); }
+      try { return Response.json({ roles: listRoles(), plans: listPlans() }); }
       catch (e) { return Response.json({ error: (e as Error).message }, { status: 400 }); }
     }
     if (p === '/__fleet/new' && req.method === 'POST') {
       try {
-        const b = (await req.json()) as { role?: string; slug?: string };
-        const out = spawnAgent(b.role || '', b.slug || '');
+        const b = (await req.json()) as { role?: string; slug?: string; planId?: string };
+        const out = spawnAgent(b.role || '', b.slug || '', b.planId);
         return Response.json({ ok: true, output: out });
       } catch (e) { return Response.json({ error: (e as Error).message }, { status: 400 }); }
     }

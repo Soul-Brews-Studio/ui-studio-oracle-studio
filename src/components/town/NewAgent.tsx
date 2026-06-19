@@ -1,25 +1,28 @@
 // "New agent" form (brewbot /new): pick a role, enter a slug, spawn via
 // `maw wake <role> --wt <slug> --fresh`. The agent appears on the map next poll.
 import { useEffect, useState } from 'react';
-import { fetchRoles, newAgent } from '../../lib/fleet';
+import { fetchRoles, newAgent, type AgentPlan } from '../../lib/fleet';
 import { costumeFor } from '../../lib/role-costume';
 
 export function NewAgent({ onClose }: { onClose: () => void }) {
   const [roles, setRoles] = useState<string[]>([]);
+  const [plans, setPlans] = useState<AgentPlan[]>([]);
   const [role, setRole] = useState('');
+  const [planId, setPlanId] = useState('default');
   const [slug, setSlug] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    fetchRoles().then((r) => { setRoles(r); if (r[0]) setRole(r[0]); }).catch((e) => setErr((e as Error).message));
+    fetchRoles().then((r) => { setRoles(r.roles); setPlans(r.plans); if (r.roles[0]) setRole(r.roles[0]); })
+      .catch((e) => setErr((e as Error).message));
   }, []);
 
   const create = async () => {
     if (!role || !slug.trim() || busy) return;
     setBusy(true); setErr(null);
-    try { await newAgent(role, slug.trim()); setDone(true); setTimeout(onClose, 1200); }
+    try { await newAgent(role, slug.trim(), planId); setDone(true); setTimeout(onClose, 1200); }
     catch (e) { setErr((e as Error).message); }
     finally { setBusy(false); }
   };
@@ -47,6 +50,21 @@ export function NewAgent({ onClose }: { onClose: () => void }) {
           {roles.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
 
+        {plans.length > 1 && (
+          <>
+            <label className="block text-[11px] text-white/50 mb-1">Claude account</label>
+            <select
+              value={planId}
+              onChange={(e) => setPlanId(e.target.value)}
+              disabled={busy}
+              className="w-full mb-3 rounded px-2 py-1.5 text-[12px]"
+              style={{ background: '#101018', border: '1px solid rgba(255,255,255,0.12)', color: '#e0e0e0' }}
+            >
+              {plans.map((pl) => <option key={pl.id} value={pl.id}>{pl.name}</option>)}
+            </select>
+          </>
+        )}
+
         <label className="block text-[11px] text-white/50 mb-1">slug (worktree / task name)</label>
         <input
           value={slug}
@@ -69,7 +87,7 @@ export function NewAgent({ onClose }: { onClose: () => void }) {
             className="px-3 py-1.5 rounded text-[12px] disabled:opacity-40"
             style={{ background: '#4ade8022', color: '#4ade80', border: '1px solid #4ade8055' }}
           >{busy ? 'spawning…' : 'create'}</button>
-          <span className="text-[10px] text-white/35 font-mono truncate">maw wake {role || '…'} --wt {slug || '…'} --fresh</span>
+          <span className="text-[10px] text-white/35 font-mono truncate">maw wake {role || '…'} --wt {slug || '…'} --fresh{plans.length > 1 ? ` · ${plans.find((p) => p.id === planId)?.name || ''}` : ''}</span>
         </div>
       </div>
     </div>

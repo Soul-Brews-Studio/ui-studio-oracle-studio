@@ -75,6 +75,26 @@ function accessToken(dir: string): string | null {
   } catch { return null; }
 }
 
+/** Plan id+name list for the spawn UI (default first). */
+export function listPlans(): Array<{ id: string; name: string }> {
+  return loadPlans().map((p) => ({ id: p.id, name: p.name }));
+}
+/** Look up a plan by id (for the spawn endpoint). */
+export function planById(id: string): Plan | undefined {
+  return loadPlans().find((p) => p.id === id);
+}
+/** The plan's web-auth token: an explicit `token`, else read from its config-dir. */
+export function planAccessToken(p: Plan): string | null {
+  const tok = (p.token || '').trim();
+  if (tok && tok.startsWith('sk-ant-oat')) return tok;
+  return accessToken(p.dir || '');
+}
+/** A plan is the true passthrough (use the logged-in ~/.claude, no injection)
+ *  only when it pins NO dir and NO token. A named plan with a dir still injects. */
+export function planIsPassthrough(p: Plan): boolean {
+  return !p.dir && !(p.token || '').trim();
+}
+
 // One quota limit, mirroring the CLI /usage breakdown. `used` is the % consumed
 // (the CLI shows "X% used"); the UI derives "left" = 100 − used.
 export interface QuotaLimit { label: string; kind: string; used: number; resetsAt: string; active: boolean }
