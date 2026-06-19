@@ -22,22 +22,27 @@ function loadPlans(): Plan[] {
   return plans;
 }
 
-// A token is web-auth (subscription) iff it's an OAuth token (sk-ant-oat…). An API
-// key (sk-ant-api…) is NOT allowed — the whole point is subscription auth.
-const isWebToken = (t: string) => /^sk-ant-oat/i.test(t.trim());
+// An API key (sk-ant-api…) is explicitly rejected — subscription web-auth only.
+// Whether a token is genuinely web-auth is decided by `claude auth status`
+// (authMethod === 'claude.ai'), NOT by a prefix guess — the CLI is the truth.
 const isApiKey = (t: string) => /^sk-ant-api/i.test(t.trim());
 
-// Build the env a plan runs under. NEVER pass an API key; a dir/token plan
-// explicitly clears ANTHROPIC_API_KEY so a stray shell key can't bill the API.
+// systemd launches the server with a minimal PATH that lacks ~/.local/bin (where
+// `claude` lives) and ~/go/bin (ghq). Prepend them so child CLIs resolve.
+const TOOL_PATH = [join(homedir(), '.local/bin'), join(homedir(), 'go/bin')].join(':');
+
+// Build the env a plan runs under. A token plan injects CLAUDE_CODE_OAUTH_TOKEN
+// (the web-auth slot — never ANTHROPIC_API_KEY); ANTHROPIC_API_KEY is always
+// cleared so a stray shell key can't silently bill the API.
 export function planEnv(p: Plan): Record<string, string> | { error: string } {
   const env = { ...process.env } as Record<string, string>;
+  env.PATH = `${TOOL_PATH}:${env.PATH || ''}`;
   delete env.ANTHROPIC_API_KEY;
   delete env.CLAUDE_CODE_OAUTH_TOKEN;
   delete env.CLAUDE_CONFIG_DIR;
   const token = (p.token || '').trim();
   if (token) {
-    if (isApiKey(token)) return { error: 'API key not allowed — use a web-auth (sk-ant-oat) token' };
-    if (!isWebToken(token)) return { error: 'token is not a recognised web-auth (sk-ant-oat) token' };
+    if (isApiKey(token)) return { error: 'API key not allowed — use a web-auth (subscription) token' };
     env.CLAUDE_CODE_OAUTH_TOKEN = token;
   } else if (p.dir) {
     env.CLAUDE_CONFIG_DIR = p.dir;
