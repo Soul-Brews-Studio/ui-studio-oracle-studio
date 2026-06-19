@@ -1,13 +1,33 @@
 // Agent text-session window: a deep conversation History (session transcript) +
 // a Live tab (current TUI screen, for driving menus). You can type a line straight
 // into the pane (Enter submits), tap TUI nav keys, or one-click "nudge".
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { FleetAgent } from '../../lib/fleet';
 import { capturePane, fetchTranscript, sendToPane, sendKeyToPane, closePaneSession } from '../../lib/fleet';
 import { costumeFor, ctxColor } from '../../lib/role-costume';
 
 const NAV_KEYS: Array<[string, string]> = [['↑', 'up'], ['↓', 'down'], ['←', 'left'], ['→', 'right']];
 type Tab = 'history' | 'live';
+
+// Turn bare URLs in the pane/transcript text into clickable links (new tab).
+const URL_RE = /(https?:\/\/[^\s<>"'`)\]}]+)/g;
+function linkify(s: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  let last = 0, i = 0, m: RegExpExecArray | null;
+  URL_RE.lastIndex = 0;
+  while ((m = URL_RE.exec(s)) !== null) {
+    if (m.index > last) out.push(s.slice(last, m.index));
+    let url = m[0], trail = '';
+    const tm = url.match(/[.,;:!?)\]]+$/); // don't swallow trailing punctuation
+    if (tm) { trail = tm[0]; url = url.slice(0, -trail.length); }
+    out.push(<a key={i++} href={url} target="_blank" rel="noreferrer" style={{ color: '#7dd3fc', textDecoration: 'underline' }}>{url}</a>);
+    if (trail) out.push(trail);
+    last = m.index + m[0].length;
+  }
+  if (last < s.length) out.push(s.slice(last));
+  return out;
+}
 
 export function AgentChat({ agent, onClose }: { agent: FleetAgent; onClose: () => void }) {
   const [tab, setTab] = useState<Tab>('live');
@@ -24,6 +44,7 @@ export function AgentChat({ agent, onClose }: { agent: FleetAgent; onClose: () =
   const taRef = useRef<HTMLTextAreaElement>(null);
   const stick = useRef(true);
   const cos = costumeFor(agent.role);
+  const body = useMemo<ReactNode>(() => (text ? linkify(text) : 'capturing session…'), [text]);
 
   // Live = current TUI screen (the pane has no scrollback); History = full transcript.
   const load = (signal?: AbortSignal) =>
@@ -139,7 +160,7 @@ export function AgentChat({ agent, onClose }: { agent: FleetAgent; onClose: () =
           className="flex-1 overflow-auto m-0 px-3 py-2 text-[11px] leading-snug whitespace-pre-wrap break-words"
           style={{ background: '#08080c', color: '#cdd2cd', fontFamily: 'ui-monospace,Menlo,monospace' }}
         >
-          {text || 'capturing session…'}
+          {body}
         </pre>
 
         <div className="flex items-center gap-1 px-2 pt-2 flex-wrap">
