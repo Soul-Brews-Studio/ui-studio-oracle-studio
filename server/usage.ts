@@ -26,6 +26,7 @@ function loadPlans(): Plan[] {
 // Whether a token is genuinely web-auth is decided by `claude auth status`
 // (authMethod === 'claude.ai'), NOT by a prefix guess — the CLI is the truth.
 const isApiKey = (t: string) => /^sk-ant-api/i.test(t.trim());
+const expandTilde = (d: string) => (d.startsWith('~') ? join(homedir(), d.slice(1).replace(/^[/\\]/, '')) : d);
 
 // systemd launches the server with a minimal PATH that lacks ~/.local/bin (where
 // `claude` lives) and ~/go/bin (ghq). Prepend them so child CLIs resolve.
@@ -40,12 +41,14 @@ export function planEnv(p: Plan): Record<string, string> | { error: string } {
   delete env.ANTHROPIC_API_KEY;
   delete env.CLAUDE_CODE_OAUTH_TOKEN;
   delete env.CLAUDE_CONFIG_DIR;
+  // A config-dir wins over a token when both are set: it's the richer, fully
+  // isolated option (own login profile + own transcript dir for per-account usage).
   const token = (p.token || '').trim();
-  if (token) {
+  if (p.dir) {
+    env.CLAUDE_CONFIG_DIR = expandTilde(p.dir);
+  } else if (token) {
     if (isApiKey(token)) return { error: 'API key not allowed — use a web-auth (subscription) token' };
     env.CLAUDE_CODE_OAUTH_TOKEN = token;
-  } else if (p.dir) {
-    env.CLAUDE_CONFIG_DIR = p.dir;
   }
   return env;
 }
@@ -62,7 +65,8 @@ function authStatus(p: Plan): Record<string, unknown> {
 interface Win { in: number; out: number; cache: number; msgs: number }
 const zero = (): Win => ({ in: 0, out: 0, cache: 0, msgs: 0 });
 function tokenUsage(dir: string) {
-  const root = join(dir || join(homedir(), '.claude'), 'projects');
+  const base = dir ? expandTilde(dir) : join(homedir(), '.claude');
+  const root = join(base, 'projects');
   const now = Date.now();
   const W = { h5: now - 5 * 3600e3, d1: now - 24 * 3600e3, d7: now - 7 * 24 * 3600e3 };
   const acc = { h5: zero(), d1: zero(), d7: zero() };
