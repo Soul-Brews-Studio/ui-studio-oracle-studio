@@ -10,6 +10,8 @@ import { buildStage } from '../../lib/town-stage';
 import { costumeFor, charIndexFor, ctxColor, activityEmoji } from '../../lib/role-costume';
 import { SHEET_URL, SHEET_W, SHEET_H, SPRITE, bgPos } from '../../lib/sprite';
 import { buildProps } from '../../lib/town-props';
+import { loadZoneTextures, saveZoneTextures, textureById } from '../../lib/textures';
+import { TexturePicker } from './TexturePicker';
 
 interface Actor {
   id: string; x: number; y: number; tx: number; ty: number;
@@ -34,6 +36,8 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
   const [width, setWidth] = useState(1180);
   const stage = useMemo(() => buildStage(districts, width), [districts, width]);
   const props = useMemo(() => buildProps(stage), [stage]);
+  const [zoneTex, setZoneTex] = useState<Record<string, string>>(loadZoneTextures);
+  const [picking, setPicking] = useState<{ id: string; label: string } | null>(null);
   const actors = useRef<Map<string, Actor>>(new Map());
   const els = useRef<Map<string, HTMLDivElement>>(new Map());
   const stageRef = useRef<HTMLDivElement>(null);
@@ -228,14 +232,22 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
         </div>
       ))}
 
-      {stage.zones.map((z) => (
-        <div key={z.id} className={`town-zone town-zone-${z.kind}`} style={{ left: z.x, top: z.y, width: z.w, height: z.h }}>
-          <span className="town-zone-label">
-            {z.kind === 'campaign' ? '🎩' : z.kind === 'team' ? '🏠' : '·'} {z.label}
-            {z.kind === 'team' && !z.known ? ' ~' : ''}
-          </span>
-        </div>
-      ))}
+      {stage.zones.map((z) => {
+        const tex = textureById(zoneTex[z.id] || 'default');
+        return (
+          <div key={z.id} className={`town-zone town-zone-${z.kind}`} style={{
+            left: z.x, top: z.y, width: z.w, height: z.h,
+            ...(tex?.url ? { backgroundImage: `url(${tex.url})`, backgroundSize: `${tex.size}px`, backgroundRepeat: 'repeat', imageRendering: 'pixelated' as const } : {}),
+          }}>
+            <span className="town-zone-label">
+              {z.kind === 'campaign' ? '🎩' : z.kind === 'team' ? '🏠' : '·'} {z.label}
+              {z.kind === 'team' && !z.known ? ' ~' : ''}
+            </span>
+            <button className="town-zone-paint" title="change floor texture"
+              onClick={(e) => { e.stopPropagation(); setPicking({ id: z.id, label: z.label }); }}>🎨</button>
+          </div>
+        );
+      })}
 
       {state.agents.map((a) => {
         const p = stage.placements[a.id];
@@ -264,6 +276,7 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
               <b style={{ color: cos.color }}>{cos.title}</b>
               {a.label && a.label !== 'oracle' ? <span className="town-nametag-slug">·{a.label}</span> : null}
               {a.ctxPct != null ? <span className="town-nametag-slug" style={{ color: ctxColor(a.ctxPct) }}> {a.ctxPct}%</span> : null}
+              {a.plan ? <span className="town-plan-badge" title={`Claude account: ${a.plan}`}>🔑{a.plan}</span> : null}
             </span>
             {a.waiting ? (
               <span className="town-bubble town-bubble-wait" title="waiting for your input — click to answer the menu">🔔</span>
@@ -276,6 +289,18 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
         );
       })}
     </div>
+    {picking && (
+      <TexturePicker
+        zoneLabel={picking.label}
+        current={zoneTex[picking.id] || 'default'}
+        onPick={(id) => {
+          const m = { ...zoneTex };
+          if (id === 'default') delete m[picking.id]; else m[picking.id] = id;
+          setZoneTex(m); saveZoneTextures(m);
+        }}
+        onClose={() => setPicking(null)}
+      />
+    )}
     </div>
   );
 }

@@ -11,6 +11,8 @@ import { PixelTown } from '../components/town/PixelTown';
 import { AgentChat } from '../components/town/AgentChat';
 import { NewAgent } from '../components/town/NewAgent';
 import { Notifications } from '../components/town/Notifications';
+import { StagingBand } from '../components/town/StagingBand';
+import { UsagePanel } from '../components/town/UsagePanel';
 import './Town.css';
 
 type TownView = 'map' | 'list';
@@ -36,6 +38,7 @@ export function Town() {
   const [view, setView] = useState<TownView>('map');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
+  const [showUsage, setShowUsage] = useState(false);
   const selected = selectedId ? state.agents.find((a) => a.id === selectedId) ?? null : null;
   const openAgent = (a: FleetAgent) => setSelectedId(a.id);
 
@@ -71,6 +74,12 @@ export function Town() {
             className="px-2.5 py-1 rounded-full text-[11px]"
             style={{ background: '#4ade8022', color: '#4ade80', border: '1px solid #4ade8055' }}
           >➕ new agent</button>
+          <button
+            onClick={() => setShowUsage(true)}
+            className="px-2.5 py-1 rounded-full text-[11px]"
+            style={{ background: '#a78bfa22', color: '#c4b5fd', border: '1px solid #a78bfa55' }}
+            title="account usage / quota"
+          >📊 usage</button>
           <Notifications teams={teamGroups} agents={agentList} />
           <span className="text-[10px] text-white/35 font-mono">{state.host || '…'} · {ago(lastOk)}</span>
           <div className="inline-flex rounded-full border border-white/10 overflow-hidden text-[11px]">
@@ -104,6 +113,7 @@ export function Town() {
 
       {selected && <AgentChat key={selected.id} agent={selected} onClose={() => setSelectedId(null)} />}
       {showNew && <NewAgent onClose={() => setShowNew(false)} />}
+      {showUsage && <UsagePanel onClose={() => setShowUsage(false)} />}
 
       {loading && !state.agents.length && (
         <p className="text-center text-white/40 py-12">scanning the fleet…</p>
@@ -111,6 +121,8 @@ export function Town() {
       {!loading && !state.agents.length && !error && (
         <p className="text-center text-white/40 py-12">no agent panes found in tmux.</p>
       )}
+
+      <StagingBand />
     </div>
   );
 }
