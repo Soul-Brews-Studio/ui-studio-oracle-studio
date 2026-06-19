@@ -1,11 +1,13 @@
 // Per-account usage for the town. For each auth plan (a CLAUDE_CONFIG_DIR) we read
-// `claude auth status --json` (identity + plan tier + confirms web/claude.ai auth,
-// NOT api-key) and tally token usage from that dir's transcript JSONL over rolling
-// windows. Exact subscription %-remaining isn't exposed by the CLI (only the TUI
-// /usage has it), so token consumption per window is the reliable "how much used".
+// `claude auth status --json` for identity (email/tier, confirms web-not-api auth),
+// and the REAL subscription quota from the same OAuth endpoint the CLI's /usage
+// uses: GET https://api.anthropic.com/api/oauth/usage with the dir's OAuth access
+// token (from <dir>/.credentials.json) → 5-hour (session) + 7-day (weekly)
+// utilisation %, so "remaining" = 100 − used. The access token is read server-side
+// and sent only to api.anthropic.com over TLS — never logged or sent to the client.
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const PLANS_FILE = join(homedir(), '.fleet-town', 'auth-plans.json');
@@ -62,77 +64,65 @@ function authStatus(p: Plan): Record<string, unknown> {
   } catch (e) { return { loggedIn: false, error: (e as Error).message.slice(0, 120) }; }
 }
 
-interface Win { in: number; out: number; cache: number; msgs: number }
-const zero = (): Win => ({ in: 0, out: 0, cache: 0, msgs: 0 });
-function tokenUsage(dir: string) {
+// Read the live OAuth access token from a config-dir's credentials.
+function accessToken(dir: string): string | null {
   const base = dir ? expandTilde(dir) : join(homedir(), '.claude');
-  const root = join(base, 'projects');
-  const now = Date.now();
-  const W = { h5: now - 5 * 3600e3, d1: now - 24 * 3600e3, d7: now - 7 * 24 * 3600e3 };
-  const acc = { h5: zero(), d1: zero(), d7: zero() };
-  if (!existsSync(root)) return acc;
-  let files: string[] = [];
+  const f = join(base, '.credentials.json');
+  if (!existsSync(f)) return null;
   try {
-    for (const d of readdirSync(root)) {
-      const pd = join(root, d);
-      try { for (const f of readdirSync(pd)) if (f.endsWith('.jsonl')) files.push(join(pd, f)); } catch { /* skip */ }
-    }
-  } catch { return acc; }
-  for (const f of files) {
-    let st; try { st = statSync(f); } catch { continue; }
-    if (st.mtimeMs < W.d7 || st.size > 120_000_000) continue;     // only files touched in the window; skip huge
-    let text; try { text = readFileSync(f, 'utf8'); } catch { continue; }
-    for (const line of text.split('\n')) {
-      if (!line || line.indexOf('"usage"') === -1) continue;
-      let o; try { o = JSON.parse(line); } catch { continue; }
-      const u = (o.message?.usage) || o.usage; if (!u) continue;
-      const ts = Date.parse(o.timestamp || '') || st.mtimeMs;
-      const inc = (w: Win) => { w.in += u.input_tokens || 0; w.out += u.output_tokens || 0; w.cache += (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0); w.msgs += 1; };
-      if (ts >= W.h5) inc(acc.h5);
-      if (ts >= W.d1) inc(acc.d1);
-      if (ts >= W.d7) inc(acc.d7);
-    }
-  }
-  return acc;
+    const t = JSON.parse(readFileSync(f, 'utf8'))?.claudeAiOauth?.accessToken;
+    return typeof t === 'string' && t.startsWith('sk-ant-oat') ? t : null;
+  } catch { return null; }
+}
+
+interface QuotaWin { used: number; resetsAt: string }
+export interface Quota { fiveHour?: QuotaWin; sevenDay?: QuotaWin; sevenDayOpus?: QuotaWin; error?: string }
+
+// Real subscription quota from the OAuth usage endpoint (what the CLI /usage uses).
+async function fetchQuota(token: string): Promise<Quota> {
+  try {
+    const res = await fetch('https://api.anthropic.com/api/oauth/usage', {
+      headers: { authorization: `Bearer ${token}`, 'anthropic-beta': 'oauth-2025-04-20', 'anthropic-version': '2023-06-01' },
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) return { error: `usage ${res.status}${res.status === 401 ? ' (token expired — open this account once to refresh)' : ''}` };
+    const d = await res.json() as Record<string, { utilization?: number; resets_at?: string } | null>;
+    const win = (k: string): QuotaWin | undefined => {
+      const w = d[k]; return w && typeof w.utilization === 'number' ? { used: w.utilization, resetsAt: w.resets_at || '' } : undefined;
+    };
+    return { fiveHour: win('five_hour'), sevenDay: win('seven_day'), sevenDayOpus: win('seven_day_opus') };
+  } catch (e) { return { error: (e as Error).message.slice(0, 100) }; }
 }
 
 let snapshot: unknown[] = [];
 export const getUsageSnapshot = () => snapshot;
 
-const addWin = (a: Win, b: Win): Win => ({ in: a.in + b.in, out: a.out + b.out, cache: a.cache + b.cache, msgs: a.msgs + b.msgs });
-
-function refresh() {
+async function refresh() {
   try {
-    // Resolve every plan to its auth identity + the local token usage of its dir.
-    const resolved = loadPlans().map((p) => ({ plan: p, auth: authStatus(p), usage: tokenUsage(p.dir || '') }));
+    // Resolve every plan → its auth identity + its dir's live OAuth token.
+    const resolved = loadPlans().map((p) => ({ plan: p, auth: authStatus(p), token: accessToken(p.dir || '') }));
 
-    // Group by ACCOUNT (email) — the user asked for usage PER ACCOUNT, and the
-    // same login across config-dirs shares ONE real subscription quota. Local
-    // transcript usage from each of that account's dirs is summed, so the same
-    // account always shows the same number regardless of how many plans map to
-    // it. Plans that aren't logged in / errored key by plan id so they show alone.
-    const groups = new Map<string, { auth: Record<string, unknown>; plans: string[]; dirs: Set<string>; usage: { h5: Win; d1: Win; d7: Win } }>();
+    // Group by ACCOUNT (email): plans that log into the same account share ONE
+    // real subscription quota, so they collapse into one card. Plans not logged
+    // in / errored key by plan id so they still show.
+    const groups = new Map<string, { auth: Record<string, unknown>; plans: string[]; token: string | null }>();
     for (const r of resolved) {
       const email = (r.auth.email as string) || '';
       const key = email || `plan:${r.plan.id}`;
       let g = groups.get(key);
-      if (!g) { g = { auth: r.auth, plans: [], dirs: new Set(), usage: { h5: zero(), d1: zero(), d7: zero() } }; groups.set(key, g); }
+      if (!g) { g = { auth: r.auth, plans: [], token: null }; groups.set(key, g); }
       g.plans.push(r.plan.name);
-      // Sum each distinct dir once (two plans on the same dir mustn't double-count).
-      const dirKey = r.plan.dir || '~/.claude';
-      if (!g.dirs.has(dirKey)) {
-        g.dirs.add(dirKey);
-        g.usage = { h5: addWin(g.usage.h5, r.usage.h5), d1: addWin(g.usage.d1, r.usage.d1), d7: addWin(g.usage.d7, r.usage.d7) };
-      }
-      if (r.auth.email && !g.auth.email) g.auth = r.auth; // prefer a logged-in identity for the group
+      if (!g.token && r.token) g.token = r.token;             // any of the account's tokens works
+      if (r.auth.email && !g.auth.email) g.auth = r.auth;
     }
-    snapshot = [...groups.values()].map((g) => ({
+
+    snapshot = await Promise.all([...groups.values()].map(async (g) => ({
       name: (g.auth.email as string) || g.plans[0],
       auth: g.auth,
       plans: g.plans,
-      usage: g.usage,
-    }));
+      quota: g.token ? await fetchQuota(g.token) : { error: 'no OAuth token on disk for this account' } as Quota,
+    })));
   } catch (e) { console.error('[usage] refresh failed', (e as Error).message); }
 }
 
-export function startUsage(ms = 300_000) { refresh(); setInterval(refresh, ms); } // every 5 min
+export function startUsage(ms = 300_000) { void refresh(); setInterval(() => void refresh(), ms); } // every 5 min
