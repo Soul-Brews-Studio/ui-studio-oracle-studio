@@ -4,10 +4,17 @@ import { useEffect, useState } from 'react';
 
 interface Win { in: number; out: number; cache: number; msgs: number }
 interface Account {
-  id: string; name: string; dir: string;
-  auth: { loggedIn?: boolean; authMethod?: string; email?: string; subscriptionType?: string; error?: string };
+  id: string; name: string;
+  auth: { loggedIn?: boolean; authMethod?: string; apiProvider?: string; email?: string; subscriptionType?: string; error?: string };
   usage: { h5: Win; d1: Win; d7: Win };
+  sharedUsage?: boolean;
 }
+
+// Web/subscription auth (NOT an API key). Browser login = 'claude.ai' (carries
+// email/tier); a `claude setup-token` token = 'oauth_token' (no profile, still
+// firstParty subscription). An API key would be 'apiKey' → not web.
+const isWeb = (a: Account['auth']) =>
+  !!a.loggedIn && a.apiProvider !== 'thirdParty' && (a.authMethod === 'claude.ai' || a.authMethod === 'oauth_token');
 
 const fmt = (n: number): string =>
   n >= 1e9 ? (n / 1e9).toFixed(1) + 'B' : n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : String(n);
@@ -52,7 +59,7 @@ export function UsagePanel({ onClose }: { onClose: () => void }) {
         {accts && !accts.length && <p className="text-[12px] text-white/40 py-6 text-center">no accounts</p>}
         <div className="flex flex-col gap-3">
           {(accts || []).map((a) => {
-            const web = a.auth.authMethod === 'claude.ai';
+            const web = isWeb(a.auth);
             return (
               <div key={a.id} className="rounded-lg border border-white/10 p-2.5">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -66,10 +73,13 @@ export function UsagePanel({ onClose }: { onClose: () => void }) {
                   <span className="text-[10px] px-1.5 py-0.5 rounded ml-auto"
                     style={web ? { background: '#4ade8022', color: '#4ade80', border: '1px solid #4ade8055' }
                       : { background: '#f8717122', color: '#fca5a5', border: '1px solid #f8717155' }}>
-                    {web ? '🌐 web (subscription)' : a.auth.loggedIn ? `⚠ ${a.auth.authMethod || 'non-web'}` : '✗ not logged in'}
+                    {web
+                      ? (a.auth.authMethod === 'oauth_token' ? '🌐 web (token)' : '🌐 web (subscription)')
+                      : a.auth.loggedIn ? `⚠ ${a.auth.authMethod || 'non-web'}` : '✗ not logged in'}
                   </span>
                 </div>
                 {a.auth.error && <p className="text-[10px] text-red-300 mt-1">{a.auth.error}</p>}
+                {a.sharedUsage && <p className="text-[10px] text-amber-300/70 mt-1">⚠ token plan shares the default transcript dir — usage below isn’t isolated to this account</p>}
                 <Windows u={a.usage} />
               </div>
             );
