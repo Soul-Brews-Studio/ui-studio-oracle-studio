@@ -75,10 +75,21 @@ function accessToken(dir: string): string | null {
   } catch { return null; }
 }
 
-interface QuotaWin { used: number; resetsAt: string }
-export interface Quota { fiveHour?: QuotaWin; sevenDay?: QuotaWin; sevenDayOpus?: QuotaWin; error?: string }
+// One quota limit, mirroring the CLI /usage breakdown. `used` is the % consumed
+// (the CLI shows "X% used"); the UI derives "left" = 100 − used.
+export interface QuotaLimit { label: string; kind: string; used: number; resetsAt: string; active: boolean }
+export interface Quota { limits?: QuotaLimit[]; error?: string }
+
+// Label each limit exactly like the Claude /usage UI.
+function labelLimit(kind: string, model?: string): string {
+  if (kind === 'session') return 'Session (5h)';
+  if (kind === 'weekly_all') return 'Weekly · All models';
+  if (kind === 'weekly_scoped') return `Weekly · ${model || 'scoped'}`;
+  return kind;
+}
 
 // Real subscription quota from the OAuth usage endpoint (what the CLI /usage uses).
+// The `limits[]` array is the authoritative, labelled source (kind + scope.model).
 async function fetchQuota(token: string): Promise<Quota> {
   try {
     const res = await fetch('https://api.anthropic.com/api/oauth/usage', {
@@ -86,11 +97,17 @@ async function fetchQuota(token: string): Promise<Quota> {
       signal: AbortSignal.timeout(12000),
     });
     if (!res.ok) return { error: `usage ${res.status}${res.status === 401 ? ' (token expired — open this account once to refresh)' : ''}` };
-    const d = await res.json() as Record<string, { utilization?: number; resets_at?: string } | null>;
-    const win = (k: string): QuotaWin | undefined => {
-      const w = d[k]; return w && typeof w.utilization === 'number' ? { used: w.utilization, resetsAt: w.resets_at || '' } : undefined;
-    };
-    return { fiveHour: win('five_hour'), sevenDay: win('seven_day'), sevenDayOpus: win('seven_day_opus') };
+    const d = await res.json() as { limits?: Array<{ kind?: string; percent?: number; resets_at?: string; is_active?: boolean; scope?: { model?: { display_name?: string } } }> };
+    const limits = (d.limits || [])
+      .filter((L) => typeof L.percent === 'number')
+      .map((L) => ({
+        label: labelLimit(L.kind || '', L.scope?.model?.display_name),
+        kind: L.kind || '',
+        used: L.percent as number,
+        resetsAt: L.resets_at || '',
+        active: !!L.is_active,
+      }));
+    return { limits };
   } catch (e) { return { error: (e as Error).message.slice(0, 100) }; }
 }
 

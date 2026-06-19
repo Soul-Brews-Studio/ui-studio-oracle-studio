@@ -3,8 +3,8 @@
 // CLI /usage uses. Bars show remaining; reset times shown alongside.
 import { useEffect, useState } from 'react';
 
-interface QuotaWin { used: number; resetsAt: string }
-interface Quota { fiveHour?: QuotaWin; sevenDay?: QuotaWin; sevenDayOpus?: QuotaWin; error?: string }
+interface QuotaLimit { label: string; kind: string; used: number; resetsAt: string; active: boolean }
+interface Quota { limits?: QuotaLimit[]; error?: string }
 interface Account {
   name: string;
   auth: { loggedIn?: boolean; authMethod?: string; apiProvider?: string; email?: string; subscriptionType?: string; error?: string };
@@ -17,28 +17,30 @@ interface Account {
 const isWeb = (a: Account['auth']) =>
   !!a.loggedIn && a.apiProvider !== 'thirdParty' && (a.authMethod === 'claude.ai' || a.authMethod === 'oauth_token');
 
-function resetIn(iso: string): string {
+// Absolute reset time in GMT+7 (Bangkok) to match the Claude /usage UI wording.
+function resetAt(iso: string): string {
   if (!iso) return '';
-  const ms = new Date(iso).getTime() - Date.now();
-  if (!isFinite(ms) || ms <= 0) return 'now';
-  const h = Math.floor(ms / 3600e3), m = Math.round((ms % 3600e3) / 60e3);
-  return h >= 24 ? `${Math.floor(h / 24)}d ${h % 24}h` : h >= 1 ? `${h}h ${m}m` : `${m}m`;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Bangkok',
+  }).format(d);
 }
 
-function Bar({ label, w }: { label: string; w?: QuotaWin }) {
-  if (!w) return null;
-  const left = Math.max(0, Math.min(100, 100 - w.used));
-  const col = left > 50 ? '#4ade80' : left > 20 ? '#fbbf24' : '#f87171';
+// Mirrors the Claude /usage rows: shows "% used" (what the app shows) + reset time.
+function Bar({ w }: { w: QuotaLimit }) {
+  const used = Math.max(0, Math.min(100, w.used));
+  const col = used < 50 ? '#4ade80' : used < 80 ? '#fbbf24' : '#f87171';
   return (
     <div className="mt-2">
       <div className="flex items-baseline justify-between text-[11px]">
-        <span className="text-white/70">{label}</span>
-        <span className="font-mono" style={{ color: col }}>{Math.round(left)}% left</span>
+        <span className="text-white/70">{w.label}{w.active ? '' : <span className="text-white/30"> · inactive</span>}</span>
+        <span className="font-mono" style={{ color: col }}>{Math.round(used)}% used</span>
       </div>
       <div className="h-2 rounded mt-1 overflow-hidden" style={{ background: '#ffffff14' }}>
-        <div style={{ width: `${left}%`, height: '100%', background: col }} />
+        <div style={{ width: `${used}%`, height: '100%', background: col }} />
       </div>
-      <div className="text-[10px] text-white/35 mt-0.5">used {Math.round(w.used)}% · resets in {resetIn(w.resetsAt)}</div>
+      <div className="text-[10px] text-white/35 mt-0.5">{Math.round(100 - used)}% left{w.resetsAt ? ` · resets ${resetAt(w.resetsAt)}` : ''}</div>
     </div>
   );
 }
@@ -81,10 +83,8 @@ export function UsagePanel({ onClose }: { onClose: () => void }) {
                 <p className="text-[10px] text-white/40 mt-0.5">plans: {a.plans.join(', ')}</p>
                 {a.auth.error && <p className="text-[10px] text-red-300 mt-1">{a.auth.error}</p>}
                 {q.error && <p className="text-[10px] text-amber-300/80 mt-1">quota: {q.error}</p>}
-                {!q.error && !q.fiveHour && !q.sevenDay && <p className="text-[10px] text-white/40 mt-1">no quota data</p>}
-                <Bar label="Session (5h)" w={q.fiveHour} />
-                <Bar label="Weekly (all models)" w={q.sevenDay} />
-                <Bar label="Weekly (Opus)" w={q.sevenDayOpus} />
+                {!q.error && !(q.limits && q.limits.length) && <p className="text-[10px] text-white/40 mt-1">no quota data</p>}
+                {(q.limits || []).map((w) => <Bar key={w.kind + w.label} w={w} />)}
               </div>
             );
           })}
