@@ -17,6 +17,7 @@ import { transcriptFor } from './transcript';
 import { listRoles, spawnAgent } from './agents';
 import { handlePush, startNotifyLoop } from './push';
 import { getEnvStatus, startEnvProbe } from './env-probe';
+import { getUsageSnapshot, startUsage } from './usage';
 
 const DIST = join(import.meta.dir, '..', 'dist');
 const PORT = Number(process.env.FLEET_PORT || 8788);
@@ -73,6 +74,10 @@ const server = Bun.serve({
 
     if (p === '/__fleet/env') {
       return Response.json(getEnvStatus(), { headers: { 'cache-control': 'no-store' } });
+    }
+
+    if (p === '/__fleet/usage') {
+      return Response.json(getUsageSnapshot(), { headers: { 'cache-control': 'no-store' } });
     }
 
     if (p === '/__fleet/pane') {
@@ -136,3 +141,5 @@ console.log(`fleet-server listening on http://${server.hostname}:${server.port} 
 startNotifyLoop(() => getFleetState());
 // Poll staging-env health (server/env-targets.json) for the /town Staging district.
 startEnvProbe();
+// Per-account auth + token usage (server/auth-plans.json) for the /usage view.
+startUsage();
