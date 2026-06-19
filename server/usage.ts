@@ -9,7 +9,9 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const PLANS_FILE = join(homedir(), '.fleet-town', 'auth-plans.json');
-interface Plan { id: string; name: string; dir: string }     // dir '' = default ~/.claude
+// A plan is EITHER dir-based (CLAUDE_CONFIG_DIR) or token-based (a web-auth OAuth
+// token). dir '' + token '' = the default logged-in ~/.claude.
+interface Plan { id: string; name: string; dir?: string; token?: string }
 function loadPlans(): Plan[] {
   let plans: Plan[] = [{ id: 'default', name: 'Default', dir: '' }];
   try {
@@ -20,10 +22,33 @@ function loadPlans(): Plan[] {
   return plans;
 }
 
-function authStatus(dir: string): Record<string, unknown> {
+// A token is web-auth (subscription) iff it's an OAuth token (sk-ant-oat…). An API
+// key (sk-ant-api…) is NOT allowed — the whole point is subscription auth.
+const isWebToken = (t: string) => /^sk-ant-oat/i.test(t.trim());
+const isApiKey = (t: string) => /^sk-ant-api/i.test(t.trim());
+
+// Build the env a plan runs under. NEVER pass an API key; a dir/token plan
+// explicitly clears ANTHROPIC_API_KEY so a stray shell key can't bill the API.
+export function planEnv(p: Plan): Record<string, string> | { error: string } {
+  const env = { ...process.env } as Record<string, string>;
+  delete env.ANTHROPIC_API_KEY;
+  delete env.CLAUDE_CODE_OAUTH_TOKEN;
+  delete env.CLAUDE_CONFIG_DIR;
+  const token = (p.token || '').trim();
+  if (token) {
+    if (isApiKey(token)) return { error: 'API key not allowed — use a web-auth (sk-ant-oat) token' };
+    if (!isWebToken(token)) return { error: 'token is not a recognised web-auth (sk-ant-oat) token' };
+    env.CLAUDE_CODE_OAUTH_TOKEN = token;
+  } else if (p.dir) {
+    env.CLAUDE_CONFIG_DIR = p.dir;
+  }
+  return env;
+}
+
+function authStatus(p: Plan): Record<string, unknown> {
+  const env = planEnv(p);
+  if ('error' in env) return { loggedIn: false, error: env.error };
   try {
-    const env = { ...process.env } as Record<string, string>;
-    if (dir) env.CLAUDE_CONFIG_DIR = dir; else delete env.CLAUDE_CONFIG_DIR;
     const out = execFileSync('claude', ['auth', 'status', '--json'], { encoding: 'utf8', env, timeout: 20000 });
     return JSON.parse(out);
   } catch (e) { return { loggedIn: false, error: (e as Error).message.slice(0, 120) }; }
@@ -67,7 +92,15 @@ export const getUsageSnapshot = () => snapshot;
 
 function refresh() {
   try {
-    snapshot = loadPlans().map((p) => ({ id: p.id, name: p.name, dir: p.dir, auth: authStatus(p.dir), usage: tokenUsage(p.dir) }));
+    snapshot = loadPlans().map((p) => ({
+      id: p.id, name: p.name,
+      auth: authStatus(p),
+      // Token usage tallies per config-dir. Token-based plans share the default
+      // projects dir (no separate dir), so their window is the shared default —
+      // flagged so the UI can note it isn't plan-isolated.
+      usage: tokenUsage(p.dir || ''),
+      sharedUsage: !!(p.token && !p.dir),
+    }));
   } catch (e) { console.error('[usage] refresh failed', (e as Error).message); }
 }
 
