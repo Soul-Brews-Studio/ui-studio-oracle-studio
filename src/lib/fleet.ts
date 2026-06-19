@@ -21,6 +21,7 @@ export interface FleetAgent {
   ctxPct?: number;     // context window REMAINING (0–100), like brewbot /ctx
   ctxModel?: string;   // model id behind that context window
   waiting?: boolean;   // parked on a TUI menu, blocking on a human answer
+  plan?: string;       // Claude account the agent runs on (account-pinned spawn); absent = default
 }
 
 export interface FleetTeam {

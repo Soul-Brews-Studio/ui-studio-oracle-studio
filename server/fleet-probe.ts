@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { parseWindow } from '../src/lib/role-costume';
 import { contextForCwd } from './context';
 import { paneNeedsInput } from './pane-io';
+import { planForPane, prunePlanCache } from './plan-detect';
 import type { FleetState, FleetAgent, FleetTeam, FleetRoad, AgentStatus } from '../src/lib/fleet';
 
 const SEP = '<|FLEET|>'; // printable token — safe vs. titles (spaces / Thai / punctuation)
@@ -21,6 +22,7 @@ const FMT = [
   '#{pane_current_command}',
   '#{pane_id}', // %NN — matches a team's createdByPane (set by `maw team create`)
   '#{pane_current_path}', // cwd → resolve the Claude transcript for context %
+  '#{pane_pid}', // shell pid → find the claude child → which Claude account (plan badge)
 ].join(SEP);
 
 const TEAMS_DIR = join(homedir(), '.claude/teams');
@@ -98,7 +100,7 @@ export async function getFleetState(): Promise<FleetState> {
 
   // First pass → agents (team assignment needs slug frequencies, computed below).
   const slugCount = new Map<string, number>();
-  const draft = rows.map(([session, winpane, windowName, title, cmd, paneId, cwd]) => {
+  const draft = rows.map(([session, winpane, windowName, title, cmd, paneId, cwd, panePid]) => {
     // Prefer the maw team's per-pane role over the window-name prefix (handles
     // multiple agents split into one window — see readTeams). canonicalize via
     // parseWindow so e.g. "next-dev-1" maps to the next-dev costume.
@@ -112,6 +114,7 @@ export async function getFleetState(): Promise<FleetState> {
       id: `${session}:${winpane}`,
       paneId: paneId || '',
       cwd: cwd || '',
+      panePid: Number(panePid) || 0,
       mappedTeam: mapped?.team ?? null,
       session, windowName: windowName || '', role, label,
       glyph, task: taskText(title || '', glyph),
@@ -121,7 +124,8 @@ export async function getFleetState(): Promise<FleetState> {
   });
   const idByPane = new Map(draft.filter((d) => d.paneId).map((d) => [d.paneId, d.id]));
 
-  const agents: FleetAgent[] = draft.map(({ cwd, mappedTeam, ...rest }) => {
+  prunePlanCache(new Set(draft.map((d) => d.paneId)));
+  const agents: FleetAgent[] = draft.map(({ cwd, mappedTeam, panePid, ...rest }) => {
     // A pane is a team member when maw mapped it (mappedTeam), or its slug is a real
     // maw team / shared by >1 live pane. Orchestrators are leads, never plot members.
     const isTeam = !rest.isOrchestrator && (
@@ -131,7 +135,9 @@ export async function getFleetState(): Promise<FleetState> {
     const ctx = rest.status === 'offline' ? null : contextForCwd(cwd);
     // An idle pane parked on a TUI menu is BLOCKED on a human answer, not just done.
     const waiting = rest.status === 'idle' ? paneNeedsInput(rest.paneId) : false;
-    return { ...rest, team: isTeam ? (mappedTeam ?? rest.label) : null, ctxPct: ctx?.pct, ctxModel: ctx?.model, waiting };
+    // Which Claude account this agent runs on ('' = default logged-in → no badge).
+    const plan = rest.status === 'offline' ? '' : planForPane(rest.paneId, panePid);
+    return { ...rest, team: isTeam ? (mappedTeam ?? rest.label) : null, ctxPct: ctx?.pct, ctxModel: ctx?.model, waiting, plan: plan || undefined };
   });
 
   // Dispatch roads: orchestrator → worker whose slug extends the orchestrator's slug

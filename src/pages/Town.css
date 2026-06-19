@@ -107,6 +107,7 @@
   padding: 0 4px; pointer-events: none;
 }
 .town-nametag-slug { color: rgba(255,255,255,0.5); margin-left: 2px; }
+.town-plan-badge { margin-left: 3px; color: #c4b5fd; font-size: 8px; }
 .town-zzz-pixel {
   position: absolute; top: -16px; right: 2px;
   color: rgba(255,255,255,0.65); font-size: 12px; font-weight: 700; pointer-events: none;

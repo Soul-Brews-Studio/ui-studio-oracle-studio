@@ -276,6 +276,7 @@ export function PixelTown({ state, onSelect }: { state: FleetState; onSelect: (a
               <b style={{ color: cos.color }}>{cos.title}</b>
               {a.label && a.label !== 'oracle' ? <span className="town-nametag-slug">·{a.label}</span> : null}
               {a.ctxPct != null ? <span className="town-nametag-slug" style={{ color: ctxColor(a.ctxPct) }}> {a.ctxPct}%</span> : null}
+              {a.plan ? <span className="town-plan-badge" title={`Claude account: ${a.plan}`}>🔑{a.plan}</span> : null}
             </span>
             {a.waiting ? (
               <span className="town-bubble town-bubble-wait" title="waiting for your input — click to answer the menu">🔔</span>

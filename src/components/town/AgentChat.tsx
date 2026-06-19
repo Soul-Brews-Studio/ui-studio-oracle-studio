@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { FleetAgent } from '../../lib/fleet';
-import { capturePane, fetchTranscript, sendToPane, sendKeyToPane, closePaneSession } from '../../lib/fleet';
+import { capturePane, fetchTranscript, sendToPane, sendKeyToPane, closePaneSession, fetchRoles, newAgent, type AgentPlan } from '../../lib/fleet';
 import { costumeFor, ctxColor } from '../../lib/role-costume';
 import { loadPresets, savePresets, PROMPT_MARK, type ChatPreset } from '../../lib/presets';
 import { PresetManager } from './PresetManager';
@@ -44,6 +44,24 @@ export function AgentChat({ agent, onClose }: { agent: FleetAgent; onClose: () =
   const [confirmClose, setConfirmClose] = useState(false);
   const [presets, setPresets] = useState<ChatPreset[]>(loadPresets);
   const [managing, setManaging] = useState(false);
+  const [plans, setPlans] = useState<AgentPlan[]>([]);
+  const [switching, setSwitching] = useState(false);
+  // A spawnable slug (its worktree/campaign) — switch only makes sense for these.
+  const slug = agent.label && agent.label !== 'oracle' ? agent.label : '';
+
+  useEffect(() => { fetchRoles().then((r) => setPlans(r.plans)).catch(() => {}); }, []);
+
+  // Switch this agent to another Claude account: respawn role+slug on the new
+  // account (maw reuses the worktree), then close the old pane. Ends this session.
+  const switchPlan = async (planId: string) => {
+    if (!slug || switching) return;
+    setSwitching(true); setErr(null);
+    try {
+      await newAgent(agent.role, slug, planId);   // fresh session on the chosen account
+      await closePaneSession(agent.paneId);        // retire the old pane
+      onClose();
+    } catch (e) { setErr((e as Error).message); setSwitching(false); }
+  };
   const preRef = useRef<HTMLPreElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const stick = useRef(true);
@@ -159,6 +177,19 @@ export function AgentChat({ agent, onClose }: { agent: FleetAgent; onClose: () =
           </div>
           {agent.ctxPct != null && (
             <span className="text-[11px] ml-auto font-mono" style={{ color: ctxColor(agent.ctxPct) }}>ctx {agent.ctxPct}%</span>
+          )}
+          {slug && plans.length > 1 && (
+            <select
+              value=""
+              disabled={switching}
+              onChange={(e) => { if (e.target.value && confirm(`Switch ${agent.role}·${slug} to ${plans.find((p) => p.id === e.target.value)?.name}?\nThis ends the current session and respawns on that account.`)) switchPlan(e.target.value); }}
+              className={`${agent.ctxPct == null ? 'ml-auto' : 'ml-1'} text-[10px] px-1 py-0.5 rounded`}
+              style={{ background: '#a78bfa18', color: '#c4b5fd', border: '1px solid #a78bfa44' }}
+              title="switch this agent to another Claude account (respawns)"
+            >
+              <option value="">{switching ? 'switching…' : `🔑 ${agent.plan || 'account'}`}</option>
+              {plans.map((pl) => <option key={pl.id} value={pl.id}>→ {pl.name}</option>)}
+            </select>
           )}
           <button
             onClick={closeSession}

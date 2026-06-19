@@ -13,8 +13,8 @@ import { execFileSync } from 'node:child_process';
 const PLANS_FILE = join(homedir(), '.fleet-town', 'auth-plans.json');
 // A plan is EITHER dir-based (CLAUDE_CONFIG_DIR) or token-based (a web-auth OAuth
 // token). dir '' + token '' = the default logged-in ~/.claude.
-interface Plan { id: string; name: string; dir?: string; token?: string }
-function loadPlans(): Plan[] {
+export interface Plan { id: string; name: string; dir?: string; token?: string }
+export function loadPlans(): Plan[] {
   let plans: Plan[] = [{ id: 'default', name: 'Default', dir: '' }];
   try {
     const v = JSON.parse(readFileSync(PLANS_FILE, 'utf8'));
