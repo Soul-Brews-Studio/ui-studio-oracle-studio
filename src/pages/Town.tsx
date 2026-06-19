@@ -89,8 +89,6 @@ export function Town() {
         </div>
       </div>
 
-      <StagingBand />
-
       {error && (
         <div className="mb-2 rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-[12px] text-red-300">
           fleet probe error: {error}
@@ -114,6 +112,8 @@ export function Town() {
       {!loading && !state.agents.length && !error && (
         <p className="text-center text-white/40 py-12">no agent panes found in tmux.</p>
       )}
+
+      <StagingBand />
     </div>
   );
 }
