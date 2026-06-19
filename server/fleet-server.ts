@@ -16,6 +16,7 @@ import { capturePane, sendToPane, sendKey, closePane } from './pane-io';
 import { transcriptFor } from './transcript';
 import { listRoles, spawnAgent } from './agents';
 import { handlePush, startNotifyLoop } from './push';
+import { getEnvStatus, startEnvProbe } from './env-probe';
 
 const DIST = join(import.meta.dir, '..', 'dist');
 const PORT = Number(process.env.FLEET_PORT || 8788);
@@ -68,6 +69,10 @@ const server = Bun.serve({
       } catch (e) {
         return Response.json({ ...EMPTY, ts: new Date().toISOString(), error: (e as Error).message });
       }
+    }
+
+    if (p === '/__fleet/env') {
+      return Response.json(getEnvStatus(), { headers: { 'cache-control': 'no-store' } });
     }
 
     if (p === '/__fleet/pane') {
@@ -129,3 +134,5 @@ console.log(`fleet-server listening on http://${server.hostname}:${server.port} 
 
 // Watch the fleet and push notifications (team-idle / agent-waiting) to PWA subscribers.
 startNotifyLoop(() => getFleetState());
+// Poll staging-env health (server/env-targets.json) for the /town Staging district.
+startEnvProbe();

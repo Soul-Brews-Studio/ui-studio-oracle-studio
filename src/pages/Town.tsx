@@ -11,6 +11,7 @@ import { PixelTown } from '../components/town/PixelTown';
 import { AgentChat } from '../components/town/AgentChat';
 import { NewAgent } from '../components/town/NewAgent';
 import { Notifications } from '../components/town/Notifications';
+import { StagingBand } from '../components/town/StagingBand';
 import './Town.css';
 
 type TownView = 'map' | 'list';
@@ -87,6 +88,8 @@ export function Town() {
           </div>
         </div>
       </div>
+
+      <StagingBand />
 
       {error && (
         <div className="mb-2 rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-[12px] text-red-300">
