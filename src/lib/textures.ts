@@ -1,0 +1,25 @@
+// Per-zone floor textures for the town. A zone (team/campaign cluster) can be
+// given a floor; the choice is stored in localStorage keyed by the zone id
+// (the cluster key). A new team with no saved choice falls back to 'default'
+// (no texture — the translucent tint over the stage grass).
+export interface FloorTexture { id: string; name: string; url?: string; size?: number }
+
+const A = '/assets/town';
+export const TEXTURES: FloorTexture[] = [
+  { id: 'default', name: 'Default' },                                  // translucent over stage grass
+  { id: 'grass', name: 'Grass', url: `${A}/grass.png`, size: 256 },
+  { id: 'stone', name: 'Stone', url: `${A}/floor-stone.png`, size: 64 },
+  { id: 'sand', name: 'Sand', url: `${A}/floor-sand.png`, size: 64 },
+  { id: 'snow', name: 'Snow', url: `${A}/floor-snow.png`, size: 64 },
+  { id: 'dark', name: 'Dark', url: `${A}/floor-dark.png`, size: 256 },
+];
+export const textureById = (id: string): FloorTexture | undefined => TEXTURES.find((t) => t.id === id);
+
+const LS = 'town:zone-textures';
+export function loadZoneTextures(): Record<string, string> {
+  try { const v = JSON.parse(localStorage.getItem(LS) || '{}'); return v && typeof v === 'object' ? v : {}; }
+  catch { return {}; }
+}
+export function saveZoneTextures(map: Record<string, string>): void {
+  try { localStorage.setItem(LS, JSON.stringify(map)); } catch { /* ignore */ }
+}
