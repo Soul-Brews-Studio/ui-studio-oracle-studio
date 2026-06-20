@@ -7,7 +7,7 @@
 // and sent only to api.anthropic.com over TLS — never logged or sent to the client.
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const PLANS_FILE = join(homedir(), '.fleet-town', 'auth-plans.json');
@@ -144,9 +144,19 @@ async function fetchQuota(token: string): Promise<Quota> {
 let snapshot: unknown[] = [];
 export const getUsageSnapshot = () => snapshot;
 
-// Last good quota per account — so a transient 429/timeout keeps showing the last
-// real numbers (flagged stale) instead of blanking the panel with an error.
-const lastGood = new Map<string, Quota>();
+// Last good quota per account — so a 429/timeout keeps showing the last real
+// numbers (flagged stale) instead of blanking the panel. PERSISTED to disk so a
+// server restart (which empties memory) still shows the last successful read while
+// the accounts are rate-limited; only a fresh good read replaces it.
+const CACHE_FILE = join(homedir(), '.fleet-town', 'usage-cache.json');
+function loadCache(): Array<[string, Quota]> {
+  try { return Object.entries(JSON.parse(readFileSync(CACHE_FILE, 'utf8')) as Record<string, Quota>); }
+  catch { return []; }
+}
+const lastGood = new Map<string, Quota>(loadCache());
+function saveCache() {
+  try { writeFileSync(CACHE_FILE, JSON.stringify(Object.fromEntries(lastGood))); } catch { /* best-effort */ }
+}
 
 async function refresh() {
   try {
@@ -167,13 +177,20 @@ async function refresh() {
       if (r.auth.email && !g.auth.email) g.auth = r.auth;
     }
 
-    snapshot = await Promise.all([...groups.values()].map(async (g) => {
+    // SEQUENTIAL with a gap — don't burst the rate-limited usage endpoint.
+    const out: unknown[] = [];
+    const gs = [...groups.values()];
+    for (let i = 0; i < gs.length; i++) {
+      const g = gs[i];
       const key = (g.auth.email as string) || g.plans.join(',');
       let quota: Quota = g.token ? await fetchQuota(g.token) : { error: 'no OAuth token on disk for this account' };
       if (quota.limits?.length) lastGood.set(key, quota);                    // a good read → remember it
       else if (quota.error && lastGood.has(key)) quota = { ...lastGood.get(key)!, stale: true }; // transient error → keep last-good
-      return { name: (g.auth.email as string) || g.plans[0], auth: g.auth, plans: g.plans, quota };
-    }));
+      out.push({ name: (g.auth.email as string) || g.plans[0], auth: g.auth, plans: g.plans, quota });
+      if (i < gs.length - 1) await sleep(1500);
+    }
+    snapshot = out;
+    saveCache(); // persist any new good reads so a restart survives a rate-limited stretch
   } catch (e) { console.error('[usage] refresh failed', (e as Error).message); }
 }
 
