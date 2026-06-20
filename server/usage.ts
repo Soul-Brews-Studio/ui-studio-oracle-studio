@@ -122,6 +122,7 @@ async function fetchQuota(token: string): Promise<Quota> {
         signal: AbortSignal.timeout(12000),
       });
       if (res.status === 429 && attempt < 1) { await sleep(2000); continue; }
+      if (res.status === 429) return { error: 'rate-limited — will refresh when the window clears' };
       if (!res.ok) return { error: `usage ${res.status}${res.status === 401 ? ' (token expired — open this account once to refresh)' : ''}` };
       const d = await res.json() as { limits?: Array<{ kind?: string; percent?: number; resets_at?: string; is_active?: boolean; scope?: { model?: { display_name?: string } } }> };
       const limits = (d.limits || [])
