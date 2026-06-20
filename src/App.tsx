@@ -23,6 +23,7 @@ import { Schedule } from './pages/Schedule';
 import { Pulse } from './pages/Pulse';
 import { Plugins } from './pages/Plugins';
 import { Sessions } from './pages/Sessions';
+import { Town } from './pages/Town';
 import { Canvas } from './pages/Canvas';
 import { Planets } from './pages/Planets';
 import { MenuEditor } from './pages/MenuEditor';
@@ -49,6 +50,10 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 function AppContent() {
   const location = useLocation();
   const isLoginPage = location.pathname === '/login';
+  // /town is served standalone (the fleet console) — the studio's other nav
+  // destinations need the full Oracle API that isn't reachable there, so hide
+  // the global header and let /town fill the screen on its own.
+  const hideHeader = isLoginPage || location.pathname === '/town';
   const [showCmdK, setShowCmdK] = useState(false);
 
   useEffect(() => {
@@ -64,7 +69,7 @@ function AppContent() {
 
   return (
     <>
-      {!isLoginPage && <Header />}
+      {!hideHeader && <Header />}
       {showCmdK && <CommandPalette onClose={() => setShowCmdK(false)} />}
       <Routes>
         <Route path="/login" element={<Login />} />
@@ -87,6 +92,7 @@ function AppContent() {
         <Route path="/pulse" element={<RequireAuth><Pulse /></RequireAuth>} />
         <Route path="/sessions" element={<RequireAuth><Sessions /></RequireAuth>} />
         <Route path="/sessions/:id" element={<RequireAuth><Sessions /></RequireAuth>} />
+        <Route path="/town" element={<RequireAuth><Town /></RequireAuth>} />
         <Route path="/canvas" element={<RequireAuth><Canvas /></RequireAuth>} />
         <Route path="/planets" element={<RequireAuth><Planets /></RequireAuth>} />
         <Route path="/plugins" element={<RequireAuth><Plugins /></RequireAuth>} />

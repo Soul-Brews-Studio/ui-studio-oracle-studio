@@ -1,0 +1,178 @@
+/* Fleet Town animations — "working" agents walk, "asleep" agents drift a zzz,
+   dispatch roads have a marching-ants dash. Kept tiny + class-driven. */
+
+@keyframes town-walk {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50%      { transform: translateY(-3px) rotate(2deg); }
+}
+
+@keyframes town-zzz {
+  0%   { opacity: 0;   transform: translateY(2px) scale(0.8); }
+  40%  { opacity: 0.8; }
+  100% { opacity: 0;   transform: translateY(-9px) scale(1.1); }
+}
+
+@keyframes town-dash {
+  to { stroke-dashoffset: -18; }
+}
+
+.town-working .town-avatar {
+  animation: town-walk 0.9s ease-in-out infinite;
+}
+
+.town-zzz {
+  animation: town-zzz 2.4s ease-in-out infinite;
+}
+
+.town-road {
+  stroke-dasharray: 5 4;
+  animation: town-dash 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .town-working .town-avatar,
+  .town-zzz,
+  .town-road { animation: none; }
+}
+
+/* Mobile: shrink the labels/badges so crowded zones stay readable on a phone. */
+@media (max-width: 520px) {
+  .town-nametag { font-size: 8px; padding: 0 2px; top: -11px; max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+  .town-bubble { font-size: 11px; top: 0; right: -4px; }
+  .town-crown { font-size: 11px; top: -22px; }
+  .town-district-label { font-size: 12px; }
+  .town-zone-label { font-size: 10px; }
+}
+
+/* ---- Pixel map view (ai-town style) ---- */
+.town-stage {
+  position: relative;
+  image-rendering: pixelated;
+  border-radius: 12px;
+  overflow: hidden;
+  /* Cainos grass — a 4×4 (128px) block of calm olive grass variants, repeated to
+     fill the map. Rendered at 2× (256px block) to match the folk-sprite scale. */
+  background-color: #6a7a30;
+  background-image: url('/assets/town/grass.png');
+  background-repeat: repeat;
+  background-size: 256px 256px;
+  box-shadow: inset 0 0 90px rgba(0,0,0,0.55);
+}
+.town-district-label {
+  position: absolute;
+  font-weight: 700; font-size: 13px; color: #e6ffe9;
+  text-shadow: 0 1px 3px #000; z-index: 5;
+}
+.town-dcount { font-weight: 400; font-size: 10px; color: #cfe8d0; margin-left: 6px; }
+.town-zone {
+  position: absolute; border-radius: 7px; box-sizing: border-box;
+}
+.town-zone-team { border: 3px dashed rgba(150,210,150,0.32); background: rgba(120,200,120,0.06); }
+.town-zone-campaign { border: 3px solid rgba(192,132,252,0.5); background: rgba(192,132,252,0.09); }
+.town-zone-commons { border: 2px dotted rgba(255,255,255,0.14); background: rgba(255,255,255,0.02); }
+.town-zone-label {
+  position: absolute; top: 3px; left: 7px; font-size: 11px; font-weight: 600;
+  color: #e9ffe9; text-shadow: 0 1px 2px #000; white-space: nowrap;
+}
+/* Per-zone floor-texture button (top-right of each team/campaign zone). */
+.town-zone-paint {
+  position: absolute; top: 2px; right: 4px; z-index: 4;
+  font-size: 12px; line-height: 1; padding: 1px 3px; border: none; border-radius: 5px;
+  background: rgba(0,0,0,0.45); cursor: pointer; opacity: 0.4;
+}
+.town-zone-paint:hover { opacity: 1; }
+/* Ambient scenery (nature decos + animated campfire/windmill/sparkle). Sits on
+   the grass behind every agent and never intercepts clicks — pure atmosphere. */
+.town-deco, .town-anim {
+  position: absolute; left: 0; top: 0;
+  background-repeat: no-repeat; image-rendering: pixelated;
+  pointer-events: none; will-change: transform;
+}
+/* Nature tucks behind the zone panels (z 0); animated objects (incl. the team
+   hearth campfire) sit above the zone tint but below agents (z 3). Cainos decos
+   bake their own shadow, so no CSS drop-shadow on them. */
+.town-deco { z-index: 0; }
+.town-anim { z-index: 2; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4)); }
+.town-actor {
+  position: absolute; left: 0; top: 0;
+  background-repeat: no-repeat; image-rendering: pixelated;
+  will-change: transform; z-index: 3;
+}
+.town-actor-offline { filter: grayscale(1) brightness(0.5); opacity: 0.5; }
+.town-actor-idle { filter: brightness(0.9); }
+.town-nametag {
+  position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+  white-space: nowrap; font-size: 9px; line-height: 1.4;
+  background: rgba(0,0,0,0.72); border: 1px solid; border-radius: 4px;
+  padding: 0 4px; pointer-events: none;
+}
+.town-nametag-slug { color: rgba(255,255,255,0.5); margin-left: 2px; }
+.town-plan-badge { margin-left: 3px; color: #c4b5fd; font-size: 8px; }
+.town-zzz-pixel {
+  position: absolute; top: -16px; right: 2px;
+  color: rgba(255,255,255,0.65); font-size: 12px; font-weight: 700; pointer-events: none;
+}
+/* ai-town-style activity bubble — shows WHAT each agent is doing. Upper-right of
+   the sprite (the nametag sits top-center), like a live status badge. */
+.town-bubble {
+  position: absolute; top: 2px; right: -8px;
+  font-size: 13px; line-height: 1; padding: 2px 4px; border-radius: 9px;
+  background: rgba(248,248,252,0.95); box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  pointer-events: none; white-space: nowrap; z-index: 6;
+}
+.town-bubble::after {
+  content: ''; position: absolute; bottom: -3px; left: 6px;
+  border-left: 3px solid transparent; border-right: 3px solid transparent;
+  border-top: 4px solid rgba(248,248,252,0.95);
+}
+.town-bubble-work { animation: town-bubble-pulse 1.4s ease-in-out infinite; transform-origin: bottom left; }
+.town-bubble-idle { opacity: 0.6; }
+@keyframes town-bubble-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+/* WAITING for input — the "needs you" state. Loud amber bell + glowing sprite. */
+.town-bubble-wait {
+  background: #fbbf24; box-shadow: 0 0 8px #fbbf24cc;
+  animation: town-wait-pulse 0.7s ease-in-out infinite; transform-origin: bottom left;
+}
+.town-bubble-wait::after { border-top-color: #fbbf24; }
+@keyframes town-wait-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
+.town-actor-wait { animation: town-wait-glow 0.7s ease-in-out infinite; }
+@keyframes town-wait-glow {
+  0%, 100% { filter: drop-shadow(0 0 3px #fbbf24); }
+  50%      { filter: drop-shadow(0 0 10px #fbbf24); }
+}
+.town-wait-chip { animation: town-wait-chip 1.2s ease-in-out infinite; }
+@keyframes town-wait-chip {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251,191,36,0); }
+  50%      { box-shadow: 0 0 8px 1px rgba(251,191,36,0.45); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .town-bubble-work, .town-bubble-wait, .town-actor-wait, .town-wait-chip { animation: none; }
+}
+.town-crown {
+  position: absolute; top: -26px; left: 50%; transform: translateX(-50%);
+  font-size: 13px; pointer-events: none; filter: drop-shadow(0 1px 2px #000);
+}
+
+/* ---- Staging district: env health as pixel buildings on grass ---- */
+.staging-band {
+  margin-top: 12px; padding: 10px 12px; border-radius: 12px;
+  image-rendering: pixelated; background-color: #6a7a30;
+  background-image: url('/assets/town/grass.png'); background-size: 128px 128px;
+  box-shadow: inset 0 0 60px rgba(0,0,0,0.5);
+}
+.staging-title { font-weight: 700; font-size: 13px; color: #e6ffe9; text-shadow: 0 1px 3px #000; margin-bottom: 6px; }
+.staging-sub { font-weight: 400; font-size: 11px; color: #cfe8d0; margin-left: 6px; }
+.staging-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; }
+.staging-svc { position: relative; cursor: pointer; display: flex; flex-direction: column; align-items: center; min-width: 76px; }
+.staging-bldg { position: relative; background-repeat: no-repeat; image-rendering: pixelated; }
+.staging-emoji { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); font-size: 14px; filter: drop-shadow(0 1px 2px #000); }
+.staging-label { margin-top: 5px; font-size: 11px; color: #e9ffe9; text-shadow: 0 1px 2px #000; white-space: nowrap; }
+.staging-detail {
+  position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 4px; z-index: 20;
+  background: #10141a; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 9px;
+  font-size: 10px; color: #cbd5e1; white-space: nowrap; box-shadow: 0 6px 18px rgba(0,0,0,0.55);
+}
+.staging-detail-sub { color: #94a3b8; margin: 2px 0; }
+.staging-detail a { color: #7dd3fc; }
+.staging-down .staging-bldg { animation: town-wait-glow 1s ease-in-out infinite; } /* down = pulse for attention */
+@media (prefers-reduced-motion: reduce) { .staging-down .staging-bldg { animation: none; } }

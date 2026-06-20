@@ -1,0 +1,5 @@
+[
+  { "name": "gateway", "kind": "worker", "label": "Gateway (CF Worker)", "url": "https://mb-next-gw-staging.midasgoteam.workers.dev/health" },
+  { "name": "portal", "kind": "web", "label": "Admin Portal", "url": "https://mb-next-admin-portal-staging.vercel.app/" },
+  { "name": "supabase-sinuw", "kind": "supabase", "label": "Supabase (sinuw)", "url": "https://sinuwgsqqyqzlpaavimf.supabase.co/auth/v1/health" }
+]
