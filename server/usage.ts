@@ -7,7 +7,7 @@
 // and sent only to api.anthropic.com over TLS — never logged or sent to the client.
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const PLANS_FILE = join(homedir(), '.fleet-town', 'auth-plans.json');
@@ -98,7 +98,9 @@ export function planIsPassthrough(p: Plan): boolean {
 // One quota limit, mirroring the CLI /usage breakdown. `used` is the % consumed
 // (the CLI shows "X% used"); the UI derives "left" = 100 − used.
 export interface QuotaLimit { label: string; kind: string; used: number; resetsAt: string; active: boolean }
-export interface Quota { limits?: QuotaLimit[]; error?: string }
+export interface Quota { limits?: QuotaLimit[]; error?: string; stale?: boolean }
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Label each limit exactly like the Claude /usage UI.
 function labelLimit(kind: string, model?: string): string {
@@ -111,28 +113,51 @@ function labelLimit(kind: string, model?: string): string {
 // Real subscription quota from the OAuth usage endpoint (what the CLI /usage uses).
 // The `limits[]` array is the authoritative, labelled source (kind + scope.model).
 async function fetchQuota(token: string): Promise<Quota> {
-  try {
-    const res = await fetch('https://api.anthropic.com/api/oauth/usage', {
-      headers: { authorization: `Bearer ${token}`, 'anthropic-beta': 'oauth-2025-04-20', 'anthropic-version': '2023-06-01' },
-      signal: AbortSignal.timeout(12000),
-    });
-    if (!res.ok) return { error: `usage ${res.status}${res.status === 401 ? ' (token expired — open this account once to refresh)' : ''}` };
-    const d = await res.json() as { limits?: Array<{ kind?: string; percent?: number; resets_at?: string; is_active?: boolean; scope?: { model?: { display_name?: string } } }> };
-    const limits = (d.limits || [])
-      .filter((L) => typeof L.percent === 'number')
-      .map((L) => ({
-        label: labelLimit(L.kind || '', L.scope?.model?.display_name),
-        kind: L.kind || '',
-        used: L.percent as number,
-        resetsAt: L.resets_at || '',
-        active: !!L.is_active,
-      }));
-    return { limits };
-  } catch (e) { return { error: (e as Error).message.slice(0, 100) }; }
+  // /api/oauth/usage rate-limits in bursts (429); one short retry clears most of
+  // them. A 429 that survives the retry falls back to the last-good cache (refresh()).
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await fetch('https://api.anthropic.com/api/oauth/usage', {
+        headers: { authorization: `Bearer ${token}`, 'anthropic-beta': 'oauth-2025-04-20', 'anthropic-version': '2023-06-01' },
+        signal: AbortSignal.timeout(12000),
+      });
+      if (res.status === 429 && attempt < 1) { await sleep(2000); continue; }
+      if (res.status === 429) return { error: 'rate-limited — will refresh when the window clears' };
+      if (!res.ok) return { error: `usage ${res.status}${res.status === 401 ? ' (token expired — open this account once to refresh)' : ''}` };
+      const d = await res.json() as { limits?: Array<{ kind?: string; percent?: number; resets_at?: string; is_active?: boolean; scope?: { model?: { display_name?: string } } }> };
+      const limits = (d.limits || [])
+        .filter((L) => typeof L.percent === 'number')
+        .map((L) => ({
+          label: labelLimit(L.kind || '', L.scope?.model?.display_name),
+          kind: L.kind || '',
+          used: L.percent as number,
+          resetsAt: L.resets_at || '',
+          active: !!L.is_active,
+        }));
+      return { limits };
+    } catch (e) {
+      if (attempt < 1) { await sleep(2000); continue; }
+      return { error: (e as Error).message.slice(0, 100) };
+    }
+  }
 }
 
 let snapshot: unknown[] = [];
 export const getUsageSnapshot = () => snapshot;
+
+// Last good quota per account — so a 429/timeout keeps showing the last real
+// numbers (flagged stale) instead of blanking the panel. PERSISTED to disk so a
+// server restart (which empties memory) still shows the last successful read while
+// the accounts are rate-limited; only a fresh good read replaces it.
+const CACHE_FILE = join(homedir(), '.fleet-town', 'usage-cache.json');
+function loadCache(): Array<[string, Quota]> {
+  try { return Object.entries(JSON.parse(readFileSync(CACHE_FILE, 'utf8')) as Record<string, Quota>); }
+  catch { return []; }
+}
+const lastGood = new Map<string, Quota>(loadCache());
+function saveCache() {
+  try { writeFileSync(CACHE_FILE, JSON.stringify(Object.fromEntries(lastGood))); } catch { /* best-effort */ }
+}
 
 async function refresh() {
   try {
@@ -153,12 +178,20 @@ async function refresh() {
       if (r.auth.email && !g.auth.email) g.auth = r.auth;
     }
 
-    snapshot = await Promise.all([...groups.values()].map(async (g) => ({
-      name: (g.auth.email as string) || g.plans[0],
-      auth: g.auth,
-      plans: g.plans,
-      quota: g.token ? await fetchQuota(g.token) : { error: 'no OAuth token on disk for this account' } as Quota,
-    })));
+    // SEQUENTIAL with a gap — don't burst the rate-limited usage endpoint.
+    const out: unknown[] = [];
+    const gs = [...groups.values()];
+    for (let i = 0; i < gs.length; i++) {
+      const g = gs[i];
+      const key = (g.auth.email as string) || g.plans.join(',');
+      let quota: Quota = g.token ? await fetchQuota(g.token) : { error: 'no OAuth token on disk for this account' };
+      if (quota.limits?.length) lastGood.set(key, quota);                    // a good read → remember it
+      else if (quota.error && lastGood.has(key)) quota = { ...lastGood.get(key)!, stale: true }; // transient error → keep last-good
+      out.push({ name: (g.auth.email as string) || g.plans[0], auth: g.auth, plans: g.plans, quota });
+      if (i < gs.length - 1) await sleep(1500);
+    }
+    snapshot = out;
+    saveCache(); // persist any new good reads so a restart survives a rate-limited stretch
   } catch (e) { console.error('[usage] refresh failed', (e as Error).message); }
 }
 

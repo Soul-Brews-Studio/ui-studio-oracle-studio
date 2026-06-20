@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 
 interface QuotaLimit { label: string; kind: string; used: number; resetsAt: string; active: boolean }
-interface Quota { limits?: QuotaLimit[]; error?: string }
+interface Quota { limits?: QuotaLimit[]; error?: string; stale?: boolean }
 interface Account {
   name: string;
   auth: { loggedIn?: boolean; authMethod?: string; apiProvider?: string; email?: string; subscriptionType?: string; error?: string };
@@ -83,6 +83,7 @@ export function UsagePanel({ onClose }: { onClose: () => void }) {
                 <p className="text-[10px] text-white/40 mt-0.5">plans: {a.plans.join(', ')}</p>
                 {a.auth.error && <p className="text-[10px] text-red-300 mt-1">{a.auth.error}</p>}
                 {q.error && <p className="text-[10px] text-amber-300/80 mt-1">quota: {q.error}</p>}
+                {q.stale && <p className="text-[10px] text-white/35 mt-1">showing last known values (refresh rate-limited)</p>}
                 {!q.error && !(q.limits && q.limits.length) && <p className="text-[10px] text-white/40 mt-1">no quota data</p>}
                 {(q.limits || []).map((w) => <Bar key={w.kind + w.label} w={w} />)}
               </div>
