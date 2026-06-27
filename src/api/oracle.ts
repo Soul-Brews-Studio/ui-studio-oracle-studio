@@ -218,7 +218,7 @@ export async function getMap(): Promise<{ documents: MapDocument[]; total: numbe
 export async function getMap3d(model?: string): Promise<{ documents: MapDocument[]; total: number; pca_info?: any }> {
   const params = model ? `?model=${encodeURIComponent(model)}` : '';
   const key = `map3d:${model ?? 'default'}`;
-  return cached(key, ONE_DAY, async () => {
+  return cached(key, TEN_MIN, async () => {
     const res = await fetch(`${API_BASE}/map3d${params}`);
     return res.json();
   }, { tag: 'map3d', store: 'idb' });
