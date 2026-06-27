@@ -27,11 +27,11 @@ export function EngineList({ engines, model, onSetModel }: Props) {
           <button
             key={v.key}
             onClick={() => v.enabled && onSetModel(v.key)}
-            disabled={!v.enabled}
+            disabled={!v.enabled || v.count === 0}
             className={`flex flex-col gap-0.5 p-2 rounded-lg border text-left transition-all duration-150 ${
               active
                 ? 'border-accent/40 bg-accent/5'
-                : v.enabled
+                : v.enabled && v.count > 0
                 ? 'border-border bg-white/[0.02] hover:border-border-hover cursor-pointer'
                 : 'border-border-subtle opacity-50 cursor-not-allowed'
             }`}
@@ -49,7 +49,7 @@ export function EngineList({ engines, model, onSetModel }: Props) {
                     : 'bg-red-500/20 text-red-400'
                 }`}
               >
-                {active ? 'Active' : v.enabled ? 'Switch' : 'Offline'}
+                {active ? 'Active' : v.enabled && v.count > 0 ? 'Switch' : 'Offline'}
               </span>
             </div>
             <div className="flex items-center justify-between">

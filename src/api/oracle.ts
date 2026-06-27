@@ -101,7 +101,7 @@ export async function list(type: string = 'all', limit: number = 20, offset: num
 
 // Get stats
 export async function getStats(): Promise<Stats> {
-  return cached('stats', ONE_HOUR, async () => {
+  return cached('stats', TEN_MIN, async () => {
     const res = await fetch(`${API_BASE}/stats`);
     if (!res.ok) {
       throw new Error(`Server error: ${res.status}`);
